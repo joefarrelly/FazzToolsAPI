@@ -1,3 +1,71 @@
 from django.db import models
+from django.utils.translation import gettext_lazy as _
 
 # Create your models here.
+
+
+class Alt(models.Model):
+    altId = models.PositiveIntegerField(primary_key=True)
+    altLevel = models.PositiveSmallIntegerField()
+    altName = models.CharField(max_length=40)
+    altRealm = models.CharField(max_length=40)
+    altRealmId = models.PositiveSmallIntegerField()
+    altRealmSlug = models.CharField(max_length=40)
+
+    class AltClass(models.IntegerChoices):
+        NO_CLASS = 0, _('No Class')
+        WARRIOR = 1, _('Warrior')
+        PALADIN = 2, _('Paladin')
+        HUNTER = 3, _('Hunter')
+        ROGUE = 4, _('Rogue')
+        PRIEST = 5, _('Priest')
+        DEATH_KNIGHT = 6, _('Death Knight')
+        SHAMAN = 7, _('Shaman')
+        MAGE = 8, _('Mage')
+        WARLOCK = 9, _('Warlock')
+        MONK = 10, _('Monk')
+        DRUID = 11, _('Druid')
+        DEMON_HUNTER = 12, _('Demon Hunter')
+    altClass = models.PositiveSmallIntegerField(choices=AltClass.choices, default=AltClass.NO_CLASS)
+
+    class AltRace(models.IntegerChoices):
+        NO_RACE = 0, _('No Race')
+        HUMAN = 1, _('Human')
+        ORC = 2, _('Orc')
+        DWARF = 3, _('Dwarf')
+        NIGHT_ELF = 4, _('Night Elf')
+        UNDEAD = 5, _('Undead')
+        TAUREN = 6, _('Tauren')
+        GNOME = 7, _('Gnome')
+        TROLL = 8, _('Troll')
+        GOBLIN = 9, _('Goblin')
+        BLOOD_ELF = 10, _('Blood Elf')
+        DRAENEI = 11, _('Draenei')
+        WORGEN = 22, _('Worgen')
+        PANDAREN_NEUTRAL = 24, _('Pandaren')
+        PANDAREN_ALLIANCE = 25, _('Pandaren')
+        PANDAREN_HORDE = 26, _('Pandaren')
+        NIGHTBOURNE = 27, _('Nightbourne')
+        HIGHMOUNTAIN_TAUREN = 28, _('Highmountain Tauren')
+        VOID_ELF = 29, _('Void Elf')
+        LIGHTFORGED_DRAENEI = 30, _('Lightforged Draenei')
+        ZANDALARI_TROLL = 31, _('Zandalari Troll')
+        KUL_TIRAN = 32, _('Kul Tiran')
+        DARK_IRON_DWARF = 34, _('Dark Iron Dwarf')
+        VULPERA = 35, _('Vulpera')
+        MAGHAR_ORC = 36, _('Mag\'ar Orc')
+        MECHAGNOME = 37, _('Mechagnome')
+    altRace = models.PositiveSmallIntegerField(choices=AltRace.choices, default=AltRace.NO_RACE)
+
+    altGender = models.CharField(max_length=6)
+    altFaction = models.CharField(max_length=10)
+    altExpiryDate = models.DateTimeField()
+
+    class Meta:
+        db_table = 'ft_alt'
+        constraints = [
+            models.UniqueConstraint(fields=['altName', 'altRealmSlug'], name='unique_alt')
+        ]
+
+    def __str__(self):
+        return '%s - %s' % (self.altName, self.altRealm)
