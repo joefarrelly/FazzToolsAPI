@@ -99,3 +99,42 @@ class AltProfession(models.Model):
 
     def __str__(self):
         return '%s - %s : %s' % (self.alt.altName, self.alt.altRealm, self.get_profession_display())
+
+
+class AltAchievement(models.Model):
+    alt = models.OneToOneField(Alt, on_delete=models.CASCADE, primary_key=True)
+    achievementData = models.JSONField()
+    altAchievementExpiryDate = models.DateTimeField()
+
+    class Meta:
+        db_table = 'ft_altachievement'
+
+    def __str__(self):
+        return '%s - %s' % (self.alt.altName, self.alt.altRealm)
+
+
+class AltQuestCompleted(models.Model):
+    alt = models.OneToOneField(Alt, on_delete=models.CASCADE, primary_key=True)
+    questCompletedData = models.JSONField()
+    altQuestCompletedExpiryDate = models.DateTimeField()
+
+    class Meta:
+        db_table = 'ft_altquestcompleted'
+
+    def __str__(self):
+        return '%s - %s' % (self.alt.altName, self.alt.altRealm)
+
+
+class AltMedia(models.Model):
+    alt = models.OneToOneField(Alt, on_delete=models.CASCADE, primary_key=True)
+    avatar = models.CharField(max_length=100, default=None)
+    inset = models.CharField(max_length=100, default=None)
+    main = models.CharField(max_length=100, default=None)
+    mainRaw = models.CharField(max_length=100, default=None)
+    altMediaExpiryDate = models.DateTimeField()
+
+    class Meta:
+        db_table = 'ft_altmedia'
+
+    def __str__(self):
+        return '%s - %s' % (self.alt.altName, self.alt.altRealm)

@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Alt, AltProfession
+from .models import Alt, AltProfession, AltAchievement, AltQuestCompleted, AltMedia
 
 
 class AltSerializer(serializers.HyperlinkedModelSerializer):
@@ -12,3 +12,27 @@ class AltProfessionSerializer(serializers.HyperlinkedModelSerializer):
     class Meta:
         model = AltProfession
         fields = ('alt', 'profession', 'professionData', 'altProfessionExpiryDate')
+
+
+class AltAchievementSerializer(serializers.HyperlinkedModelSerializer):
+    alt = serializers.HyperlinkedRelatedField(view_name='alt-detail', queryset=Alt.objects.all())
+
+    class Meta:
+        model = AltAchievement
+        fields = ('alt', 'achievementData', 'altAchievementExpiryDate')
+
+
+class AltQuestCompletedSerializer(serializers.HyperlinkedModelSerializer):
+    alt = serializers.HyperlinkedRelatedField(view_name='alt-detail', queryset=Alt.objects.all())
+
+    class Meta:
+        model = AltQuestCompleted
+        fields = ('alt', 'questCompletedData', 'altQuestCompletedExpiryDate')
+
+
+class AltMediaSerializer(serializers.HyperlinkedModelSerializer):
+    alt = serializers.HyperlinkedRelatedField(view_name='alt-detail', queryset=Alt.objects.all())
+
+    class Meta:
+        model = AltMedia
+        fields = ('alt', 'avatar', 'inset', 'main', 'mainRaw', 'altMediaExpiryDate')
