@@ -69,3 +69,33 @@ class Alt(models.Model):
 
     def __str__(self):
         return '%s - %s' % (self.altName, self.altRealm)
+
+
+class AltProfession(models.Model):
+    alt = models.ForeignKey(Alt, on_delete=models.CASCADE)
+
+    class Profession(models.IntegerChoices):
+        MISSING = 0, _('Missing')
+        ALCHEMY = 171, _('Alchemy')
+        BLACKSMITHING = 164, _('Blacksmithing')
+        ENCHANTING = 333, _('Enchanting')
+        ENGINEERING = 202, _('Engineering')
+        INSCRIPTION = 773, _('Inscription')
+        JEWELCRAFTING = 755, _('Jewelcrafting')
+        LEATHERWORKING = 165, _('Leatherworking')
+        TAILORING = 197, _('Tailoring')
+        HERBALISM = 182, _('Herbalism')
+        MINING = 186, _('Mining')
+    profession = models.PositiveSmallIntegerField(choices=Profession.choices, default=Profession.MISSING)
+
+    professionData = models.JSONField()
+    altProfessionExpiryDate = models.DateTimeField()
+
+    class Meta:
+        db_table = 'ft_altprofession'
+        constraints = [
+            models.UniqueConstraint(fields=['alt', 'profession'], name='unique_profession')
+        ]
+
+    def __str__(self):
+        return '%s - %s : %s' % (self.alt.altName, self.alt.altRealm, self.get_profession_display())

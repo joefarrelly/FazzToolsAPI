@@ -20,6 +20,7 @@ from apicore import views
 
 router = routers.DefaultRouter()
 router.register(r'alts', views.AltView)
+router.register(f'altprofessions', views.AltProfessionView)
 
 urlpatterns = [
     path('admin/', admin.site.urls),
