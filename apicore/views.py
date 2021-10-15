@@ -1,7 +1,7 @@
 from django.shortcuts import render
 from rest_framework import viewsets
-from .serializers import AltSerializer, AltProfessionSerializer, AltAchievementSerializer, AltQuestCompletedSerializer, AltMediaSerializer
-from .models import Alt, AltProfession, AltAchievement, AltQuestCompleted, AltMedia
+from .serializers import AltSerializer, AltProfessionSerializer, AltAchievementSerializer, AltQuestCompletedSerializer, AltMediaSerializer, EquipmentSerializer, AltEquipmentSerializer
+from .models import Alt, AltProfession, AltAchievement, AltQuestCompleted, AltMedia, Equipment, AltEquipment
 
 # Create your views here.
 
@@ -29,3 +29,13 @@ class AltQuestCompletedView(viewsets.ModelViewSet):
 class AltMediaView(viewsets.ModelViewSet):
     serializer_class = AltMediaSerializer
     queryset = AltMedia.objects.all()
+
+
+class EquipmentView(viewsets.ModelViewSet):
+    serializer_class = EquipmentSerializer
+    queryset = Equipment.objects.all()
+
+
+class AltEquipmentView(viewsets.ModelViewSet):
+    serializer_class = AltEquipmentSerializer
+    queryset = AltEquipment.objects.all()

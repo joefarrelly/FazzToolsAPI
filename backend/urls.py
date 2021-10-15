@@ -24,6 +24,8 @@ router.register(r'altprofessions', views.AltProfessionView)
 router.register(r'altachievements', views.AltAchievementView)
 router.register(r'altquestcompleteds', views.AltQuestCompletedView)
 router.register(r'altmedias', views.AltMediaView)
+router.register(r'equipments', views.EquipmentView)
+router.register(r'altequipments', views.AltEquipmentView)
 
 urlpatterns = [
     path('admin/', admin.site.urls),

@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Alt, AltProfession, AltAchievement, AltQuestCompleted, AltMedia
+from .models import Alt, AltProfession, AltAchievement, AltQuestCompleted, AltMedia, Equipment, AltEquipment
 
 
 class AltSerializer(serializers.HyperlinkedModelSerializer):
@@ -36,3 +36,15 @@ class AltMediaSerializer(serializers.HyperlinkedModelSerializer):
     class Meta:
         model = AltMedia
         fields = ('alt', 'avatar', 'inset', 'main', 'mainRaw', 'altMediaExpiryDate')
+
+
+class EquipmentSerializer(serializers.HyperlinkedModelSerializer):
+    class Meta:
+        model = Equipment
+        fields = ('item_id', 'name', 'slot', 'armour_type', 'icon')
+
+
+class AltEquipmentSerializer(serializers.HyperlinkedModelSerializer):
+    class Meta:
+        model = AltEquipment
+        fields = ('alt', 'equipment', 'item_level', 'stats', 'slot', 'quality', 'sockets', 'enchants', 'spells', 'azerite', 'altEquipmentExpiryDate')

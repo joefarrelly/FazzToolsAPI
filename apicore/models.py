@@ -138,3 +138,37 @@ class AltMedia(models.Model):
 
     def __str__(self):
         return '%s - %s' % (self.alt.altName, self.alt.altRealm)
+
+
+class Equipment(models.Model):
+    item_id = models.PositiveIntegerField(primary_key=True)
+    name = models.CharField(max_length=80)
+    slot = models.CharField(max_length=20)
+    armour_type = models.CharField(max_length=20)
+    icon = models.CharField(max_length=100)
+
+    class Meta:
+        db_table = 'ft_equipment'
+
+    def __str__(self):
+        return '%s' % (self.name, self.slot)
+
+
+class AltEquipment(models.Model):
+    alt = models.ForeignKey(Alt, on_delete=models.CASCADE)
+    equipment = models.ForeignKey(Equipment, on_delete=models.CASCADE)
+    item_level = models.PositiveSmallIntegerField()
+    stats = models.JSONField()
+    slot = models.CharField(max_length=20)
+    quality = models.CharField(max_length=20)
+    sockets = models.JSONField()
+    enchants = models.JSONField()
+    spells = models.JSONField()
+    azerite = models.JSONField()
+    altEquipmentExpiryDate = models.DateTimeField()
+
+    class Meta:
+        db_table = 'ft_altequipment'
+
+    def __str__(self):
+        return '%s' % (self.alt.altName, self.slot)
