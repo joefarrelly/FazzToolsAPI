@@ -1,11 +1,17 @@
 from rest_framework import serializers
-from .models import Alt, AltProfession, AltAchievement, AltQuestCompleted, AltMedia, Equipment, AltEquipment
+from .models import FazzToolsUser, Alt, AltProfession, AltAchievement, AltQuestCompleted, AltMedia, Equipment, AltEquipment
+
+
+class FazzToolsUserSerializer(serializers.HyperlinkedModelSerializer):
+    class Meta:
+        model = FazzToolsUser
+        fields = ('userId',)
 
 
 class AltSerializer(serializers.HyperlinkedModelSerializer):
     class Meta:
         model = Alt
-        fields = ('altId', 'altLevel', 'altName', 'altRealm', 'altRealmId', 'altRealmSlug', 'altClass', 'altRace', 'altGender', 'altFaction', 'altExpiryDate')
+        fields = ('altId', 'altLevel', 'altName', 'altRealm', 'altRealmId', 'altRealmSlug', 'altClass', 'altRace', 'altGender', 'altFaction', 'altExpiryDate', 'user')
 
 
 class AltProfessionSerializer(serializers.HyperlinkedModelSerializer):

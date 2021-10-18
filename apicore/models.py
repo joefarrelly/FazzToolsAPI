@@ -4,6 +4,13 @@ from django.utils.translation import gettext_lazy as _
 # Create your models here.
 
 
+class FazzToolsUser(models.Model):
+    userId = models.CharField(max_length=100, primary_key=True)
+
+    class Meta:
+        db_table = 'ft_fazztoolsuser'
+
+
 class Alt(models.Model):
     altId = models.PositiveIntegerField(primary_key=True)
     altLevel = models.PositiveSmallIntegerField()
@@ -60,6 +67,8 @@ class Alt(models.Model):
     altGender = models.CharField(max_length=6)
     altFaction = models.CharField(max_length=10)
     altExpiryDate = models.DateTimeField()
+
+    user = models.ForeignKey(FazzToolsUser, on_delete=models.CASCADE)
 
     class Meta:
         db_table = 'ft_alt'
