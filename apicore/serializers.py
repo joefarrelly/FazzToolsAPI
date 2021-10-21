@@ -43,7 +43,7 @@ class AltProfessionSerializer(serializers.HyperlinkedModelSerializer):
 class AltProfessionDataSerializer(serializers.HyperlinkedModelSerializer):
     class Meta:
         model = AltProfessionData
-        fields = ('id', 'altProfession', 'professionRecipe', 'isKnown')
+        fields = ('id', 'alt', 'professionRecipe', 'professionTier', 'profession', 'altProfessionDataExpiryDate')
 
 
 class AltAchievementSerializer(serializers.HyperlinkedModelSerializer):

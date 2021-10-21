@@ -174,9 +174,21 @@ class ScanAlt(viewsets.ViewSet):
                 myobj = {'access_token': token, 'namespace': 'profile-eu', 'locale': 'en_US'}
                 y = requests.get(url, params=myobj)
                 if y.status_code == 200:
+                    alt_profs = []
+                    alt_obj = Alt.objects.get(altId=y.json()['character']['id'])
+                    try:
+                        prof_obj = AltProfession.objects.get(alt=alt_obj)
+                    except AltProfession.DoesNotExist:
+                        prof_obj = AltProfession.objects.create(
+                            alt=alt_obj,
+                            profession1=0,
+                            profession2=0,
+                            altProfessionExpiryDate=timezone.now() + datetime.timedelta(days=30)
+                        )
                     try:
                         data = y.json()['primaries']
                         for prof in data:
+                            alt_profs.append(prof['profession']['id'])
                             try:
                                 obj = Profession.objects.get(professionId=prof['profession']['id'])
                             except Profession.DoesNotExist:
@@ -202,9 +214,27 @@ class ScanAlt(viewsets.ViewSet):
                                             recipeId=recipe['id'],
                                             recipeName=recipe['name']
                                         )
-
+                                    try:
+                                        obj3 = AltProfessionData.objects.get(alt=prof_obj, profession=obj, professionTier=obj1, professionRecipe=obj2)
+                                        obj3.altProfessionDataExpiryDate = timezone.now() + datetime.timedelta(days=30)
+                                        obj3.save()
+                                    except AltProfessionData.DoesNotExist:
+                                        obj3 = AltProfessionData.objects.create(
+                                            alt=prof_obj,
+                                            profession=obj,
+                                            professionTier=obj1,
+                                            professionRecipe=obj2,
+                                            altProfessionDataExpiryDate=timezone.now() + datetime.timedelta(days=30)
+                                        )
                     except KeyError:
                         return response.Response('keyerrordude')
+                    while len(alt_profs) < 2:
+                        alt_profs.append(0)
+                    obj4 = AltProfession.objects.get(alt=alt_obj)
+                    obj4.profession1 = alt_profs[0]
+                    obj4.profession2 = alt_profs[1]
+                    obj4.altProfessionExpiryDate = timezone.now() + datetime.timedelta(days=30)
+                    obj4.save()
                     return response.Response('done')
                 else:
                     return response.Response('donebutnotdone')

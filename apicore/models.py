@@ -119,8 +119,8 @@ class ProfessionRecipe(models.Model):
 
 class AltProfession(models.Model):
     alt = models.OneToOneField(Alt, on_delete=models.CASCADE, primary_key=True)
-    profession1 = models.ManyToManyField(Profession, related_name='profession1')
-    profession2 = models.ManyToManyField(Profession, related_name='profession2')
+    profession1 = models.PositiveIntegerField()
+    profession2 = models.PositiveIntegerField()
     altProfessionExpiryDate = models.DateTimeField()
 
     class Meta:
@@ -131,12 +131,17 @@ class AltProfession(models.Model):
 
 
 class AltProfessionData(models.Model):
-    altProfession = models.ForeignKey(AltProfession, on_delete=models.CASCADE)
+    alt = models.ForeignKey(AltProfession, on_delete=models.CASCADE)
     professionRecipe = models.ForeignKey(ProfessionRecipe, on_delete=models.CASCADE)
-    isKnown = models.BooleanField(default=False)
+    professionTier = models.ForeignKey(ProfessionTier, on_delete=models.CASCADE)
+    profession = models.ForeignKey(Profession, on_delete=models.CASCADE)
+    altProfessionDataExpiryDate = models.DateTimeField()
 
     class Meta:
         db_table = 'ft_altprofessiondata'
+        constraints = [
+            models.UniqueConstraint(fields=['alt', 'profession', 'professionTier', 'professionRecipe'], name='unique_altprofessiondata')
+        ]
 
 
 class AltAchievement(models.Model):
