@@ -28,10 +28,28 @@ class AltView(viewsets.ModelViewSet):
     serializer_class = AltSerializer
     queryset = Alt.objects.all()
 
+    def get_queryset(self):
+        queryset = Alt.objects.all()
+        user = self.request.query_params.get('user')
+        if user is None:
+            queryset = {}
+        else:
+            queryset = queryset.filter(user=user)
+        return queryset
+
 
 class AltProfessionView(viewsets.ModelViewSet):
     serializer_class = AltProfessionSerializer
     queryset = AltProfession.objects.all()
+
+    def get_queryset(self):
+        user = self.request.query_params.get('user')
+        queryset = Alt.objects.filter(user=user).values_list('altId', flat=True)
+        if user is None:
+            queryset = {}
+        else:
+            queryset = AltProfession.objects.filter(alt__in=queryset)
+        return queryset
 
 
 class AltAchievementView(viewsets.ModelViewSet):
@@ -118,7 +136,7 @@ class BnetLogin(viewsets.ViewSet):
                                     altExpiryDate=timezone.now() + datetime.timedelta(days=30),
                                     user=user_obj
                                 )
-                    return response.Response({"alts": altId, "user": result})
+                    return response.Response({"user": result, "alts": altId})
             except KeyError:
                 return response.Response(x.text)
         else:

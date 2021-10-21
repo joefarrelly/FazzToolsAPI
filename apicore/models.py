@@ -97,7 +97,7 @@ class AltProfession(models.Model):
         MINING = 186, _('Mining')
     profession = models.PositiveSmallIntegerField(choices=Profession.choices, default=Profession.MISSING)
 
-    professionData = models.JSONField()
+    professionData = models.CharField(max_length=1000)
     altProfessionExpiryDate = models.DateTimeField()
 
     class Meta:
