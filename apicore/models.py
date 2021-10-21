@@ -80,34 +80,63 @@ class Alt(models.Model):
         return '%s - %s' % (self.altName, self.altRealm)
 
 
+class Profession(models.Model):
+    professionId = models.PositiveIntegerField(primary_key=True)
+    professionName = models.CharField(max_length=25)
+
+    class Meta:
+        db_table = 'ft_profession'
+
+    def __str__(self):
+        return '%s - %s' % (self.professionId, self.professionName)
+
+
+class ProfessionTier(models.Model):
+    tierId = models.PositiveSmallIntegerField(primary_key=True)
+    tierName = models.CharField(max_length=25)
+
+    profession = models.ForeignKey(Profession, on_delete=models.CASCADE)
+
+    class Meta:
+        db_table = 'ft_professiontier'
+
+    def __str__(self):
+        return '%s - %s' % (self.tierId, self.tierName)
+
+
+class ProfessionRecipe(models.Model):
+    recipeId = models.PositiveSmallIntegerField(primary_key=True)
+    recipeName = models.CharField(max_length=50)
+
+    professionTier = models.ForeignKey(ProfessionTier, on_delete=models.CASCADE)
+
+    class Meta:
+        db_table = 'ft_professionrecipe'
+
+    def __str__(self):
+        return '%s - %s' % (self.recipeId, self.recipeName)
+
+
 class AltProfession(models.Model):
-    alt = models.ForeignKey(Alt, on_delete=models.CASCADE)
-
-    class Profession(models.IntegerChoices):
-        MISSING = 0, _('Missing')
-        ALCHEMY = 171, _('Alchemy')
-        BLACKSMITHING = 164, _('Blacksmithing')
-        ENCHANTING = 333, _('Enchanting')
-        ENGINEERING = 202, _('Engineering')
-        INSCRIPTION = 773, _('Inscription')
-        JEWELCRAFTING = 755, _('Jewelcrafting')
-        LEATHERWORKING = 165, _('Leatherworking')
-        TAILORING = 197, _('Tailoring')
-        HERBALISM = 182, _('Herbalism')
-        MINING = 186, _('Mining')
-    profession = models.PositiveSmallIntegerField(choices=Profession.choices, default=Profession.MISSING)
-
-    professionData = models.CharField(max_length=1000)
+    alt = models.OneToOneField(Alt, on_delete=models.CASCADE, primary_key=True)
+    profession1 = models.ManyToManyField(Profession, related_name='profession1')
+    profession2 = models.ManyToManyField(Profession, related_name='profession2')
     altProfessionExpiryDate = models.DateTimeField()
 
     class Meta:
         db_table = 'ft_altprofession'
-        constraints = [
-            models.UniqueConstraint(fields=['alt', 'profession'], name='unique_profession')
-        ]
 
     def __str__(self):
-        return '%s - %s : %s' % (self.alt.altName, self.alt.altRealm, self.get_profession_display())
+        return '%s - %s' % (self.alt.altName, self.alt.altRealm)
+
+
+class AltProfessionData(models.Model):
+    altProfession = models.ForeignKey(AltProfession, on_delete=models.CASCADE)
+    professionRecipe = models.ForeignKey(ProfessionRecipe, on_delete=models.CASCADE)
+    isKnown = models.BooleanField(default=False)
+
+    class Meta:
+        db_table = 'ft_altprofessiondata'
 
 
 class AltAchievement(models.Model):

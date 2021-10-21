@@ -1,7 +1,7 @@
 from django.shortcuts import render, redirect
 from rest_framework import viewsets, views, response
-from .serializers import FazzToolsUserSerializer, AltSerializer, AltProfessionSerializer, AltAchievementSerializer, AltQuestCompletedSerializer, AltMediaSerializer, EquipmentSerializer, AltEquipmentSerializer
-from .models import FazzToolsUser, Alt, AltProfession, AltAchievement, AltQuestCompleted, AltMedia, Equipment, AltEquipment
+from .serializers import FazzToolsUserSerializer, AltSerializer, ProfessionSerializer, ProfessionTierSerializer, ProfessionRecipeSerializer, AltProfessionSerializer, AltProfessionDataSerializer, AltAchievementSerializer, AltQuestCompletedSerializer, AltMediaSerializer, EquipmentSerializer, AltEquipmentSerializer
+from .models import FazzToolsUser, Alt, Profession, ProfessionTier, ProfessionRecipe, AltProfession, AltProfessionData, AltAchievement, AltQuestCompleted, AltMedia, Equipment, AltEquipment
 import requests
 from django.utils import timezone
 import datetime
@@ -14,6 +14,7 @@ env = environ.Env()
 environ.Env.read_env()
 
 HASH_KEY = env("HASH_KEY").encode()
+BLIZZ_CLIENT = env("BLIZZ_CLIENT")
 BLIZZ_SECRET = env("BLIZZ_SECRET")
 
 # Create your views here.
@@ -38,6 +39,21 @@ class AltView(viewsets.ModelViewSet):
         return queryset
 
 
+class ProfessionView(viewsets.ModelViewSet):
+    serializer_class = ProfessionSerializer
+    queryset = Profession.objects.all()
+
+
+class ProfessionTierView(viewsets.ModelViewSet):
+    serializer_class = ProfessionTierSerializer
+    queryset = ProfessionTier.objects.all()
+
+
+class ProfessionRecipeView(viewsets.ModelViewSet):
+    serializer_class = ProfessionRecipeSerializer
+    queryset = ProfessionRecipe.objects.all()
+
+
 class AltProfessionView(viewsets.ModelViewSet):
     serializer_class = AltProfessionSerializer
     queryset = AltProfession.objects.all()
@@ -50,6 +66,11 @@ class AltProfessionView(viewsets.ModelViewSet):
         else:
             queryset = AltProfession.objects.filter(alt__in=queryset)
         return queryset
+
+
+class AltProfessionDataView(viewsets.ModelViewSet):
+    serializer_class = AltProfessionDataSerializer
+    queryset = AltProfessionData.objects.all()
 
 
 class AltAchievementView(viewsets.ModelViewSet):
@@ -78,9 +99,6 @@ class AltEquipmentView(viewsets.ModelViewSet):
 
 
 class BnetLogin(viewsets.ViewSet):
-    # def list(self, request):
-    #     return response.Response({'hello': 'world'})
-
     def create(self, request):
         print(BLIZZ_SECRET)
         if request.data.get('state') == 'blizzardeumz76c':
@@ -141,3 +159,55 @@ class BnetLogin(viewsets.ViewSet):
                 return response.Response(x.text)
         else:
             return response.Response('error')
+
+
+class ScanAlt(viewsets.ViewSet):
+    def create(self, request):
+        print(request.data)
+        if request.data.get('name') and request.data.get('realm'):
+            url = 'https://eu.battle.net/oauth/token?grant_type=client_credentials'
+            params = {'client_id': BLIZZ_CLIENT, 'client_secret': BLIZZ_SECRET}
+            x = requests.post(url, data=params)
+            try:
+                token = x.json()['access_token']
+                url = 'https://eu.api.blizzard.com/profile/wow/character/' + request.data.get('realm') + '/' + request.data.get('name') + '/professions'
+                myobj = {'access_token': token, 'namespace': 'profile-eu', 'locale': 'en_US'}
+                y = requests.get(url, params=myobj)
+                if y.status_code == 200:
+                    try:
+                        data = y.json()['primaries']
+                        for prof in data:
+                            try:
+                                obj = Profession.objects.get(professionId=prof['profession']['id'])
+                            except Profession.DoesNotExist:
+                                obj = Profession.objects.create(
+                                    professionId=prof['profession']['id'],
+                                    professionName=prof['profession']['name']
+                                )
+                            for tier in prof['tiers']:
+                                try:
+                                    obj1 = ProfessionTier.objects.get(tierId=tier['tier']['id'])
+                                except ProfessionTier.DoesNotExist:
+                                    obj1 = ProfessionTier.objects.create(
+                                        profession=obj,
+                                        tierId=tier['tier']['id'],
+                                        tierName=tier['tier']['name']
+                                    )
+                                for recipe in tier['known_recipes']:
+                                    try:
+                                        obj2 = ProfessionRecipe.objects.get(recipeId=recipe['id'])
+                                    except ProfessionRecipe.DoesNotExist:
+                                        obj2 = ProfessionRecipe.objects.create(
+                                            professionTier=obj1,
+                                            recipeId=recipe['id'],
+                                            recipeName=recipe['name']
+                                        )
+
+                    except KeyError:
+                        return response.Response('keyerrordude')
+                    return response.Response('done')
+                else:
+                    return response.Response('donebutnotdone')
+            except Exception as e:
+                print(e)
+                return response.Response('notdone')

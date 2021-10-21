@@ -21,13 +21,18 @@ from apicore import views
 router = routers.DefaultRouter()
 router.register(r'users', views.FazzToolsUserView)
 router.register(r'alts', views.AltView)
+router.register(r'professions', views.ProfessionView)
+router.register(r'professiontiers', views.ProfessionTierView)
+router.register(r'professionrecipes', views.ProfessionRecipeView)
 router.register(r'altprofessions', views.AltProfessionView)
+router.register(r'altprofessiondatas', views.AltProfessionDataView)
 router.register(r'altachievements', views.AltAchievementView)
 router.register(r'altquestcompleteds', views.AltQuestCompletedView)
 router.register(r'altmedias', views.AltMediaView)
 router.register(r'equipments', views.EquipmentView)
 router.register(r'altequipments', views.AltEquipmentView)
 router.register(r'bnetlogin', views.BnetLogin, 'bnetlogin')
+router.register(r'scanalt', views.ScanAlt, 'scanalt')
 
 urlpatterns = [
     path('admin/', admin.site.urls),
