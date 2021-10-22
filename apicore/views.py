@@ -72,6 +72,16 @@ class AltProfessionDataView(viewsets.ModelViewSet):
     serializer_class = AltProfessionDataSerializer
     queryset = AltProfessionData.objects.all()
 
+    def get_queryset(self):
+        alt = self.request.query_params.get('alt')
+        profession = self.request.query_params.get('profession')
+        queryset = AltProfessionData.objects.all()
+        if alt is None:
+            queryset = {}
+        else:
+            queryset = queryset.filter(alt=alt, profession=profession)
+        return queryset
+
 
 class AltAchievementView(viewsets.ModelViewSet):
     serializer_class = AltAchievementSerializer
@@ -164,13 +174,17 @@ class BnetLogin(viewsets.ViewSet):
 class ScanAlt(viewsets.ViewSet):
     def create(self, request):
         print(request.data)
-        if request.data.get('name') and request.data.get('realm'):
+        if request.data.get('altId'):
+            temp = Alt.objects.get(altId=request.data.get('altId'))
+            realm = temp.altRealmSlug
+            name = temp.altName.lower()
+        # if request.data.get('name') and request.data.get('realm'):
             url = 'https://eu.battle.net/oauth/token?grant_type=client_credentials'
             params = {'client_id': BLIZZ_CLIENT, 'client_secret': BLIZZ_SECRET}
             x = requests.post(url, data=params)
             try:
                 token = x.json()['access_token']
-                url = 'https://eu.api.blizzard.com/profile/wow/character/' + request.data.get('realm') + '/' + request.data.get('name') + '/professions'
+                url = 'https://eu.api.blizzard.com/profile/wow/character/' + realm + '/' + name + '/professions'
                 myobj = {'access_token': token, 'namespace': 'profile-eu', 'locale': 'en_US'}
                 y = requests.get(url, params=myobj)
                 if y.status_code == 200:
