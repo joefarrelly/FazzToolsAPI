@@ -11,7 +11,7 @@ class FazzToolsUserSerializer(serializers.HyperlinkedModelSerializer):
 class AltSerializer(serializers.HyperlinkedModelSerializer):
     class Meta:
         model = Alt
-        fields = ('altId', 'altLevel', 'altName', 'altRealm', 'altRealmId', 'altRealmSlug', 'altClass', 'altRace', 'altGender', 'altFaction')
+        fields = ('altId', 'altLevel', 'altName', 'altRealm', 'altRealmId', 'altRealmSlug', 'altClass', 'get_altClass_display', 'altRace', 'get_altRace_display', 'altGender', 'altFaction')
 
 
 class ProfessionSerializer(serializers.HyperlinkedModelSerializer):
@@ -33,11 +33,9 @@ class ProfessionRecipeSerializer(serializers.HyperlinkedModelSerializer):
 
 
 class AltProfessionSerializer(serializers.ModelSerializer):
-    # alt = serializers.HyperlinkedRelatedField(view_name='alt-detail', queryset=Alt.objects.all())
-
     class Meta:
         model = AltProfession
-        fields = ('alt', 'profession1', 'profession2')
+        fields = ('alt', 'profession1', 'get_profession1_display', 'profession2', 'get_profession2_display')
 
 
 class AltProfessionDataSerializer(serializers.ModelSerializer):

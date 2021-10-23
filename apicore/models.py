@@ -119,8 +119,22 @@ class ProfessionRecipe(models.Model):
 
 class AltProfession(models.Model):
     alt = models.OneToOneField(Alt, on_delete=models.CASCADE, primary_key=True)
-    profession1 = models.PositiveIntegerField()
-    profession2 = models.PositiveIntegerField()
+
+    class Profession(models.IntegerChoices):
+        MISSING = 0, _('Missing')
+        ALCHEMY = 171, _('Alchemy')
+        BLACKSMITHING = 164, _('Blacksmithing')
+        ENCHANTING = 333, _('Enchanting')
+        ENGINEERING = 202, _('Engineering')
+        INSCRIPTION = 773, _('Inscription')
+        JEWELCRAFTING = 755, _('Jewelcrafting')
+        LEATHERWORKING = 165, _('Leatherworking')
+        TAILORING = 197, _('Tailoring')
+        HERBALISM = 182, _('Herbalism')
+        MINING = 186, _('Mining')
+        SKINNING = 393, _('Skinning')
+    profession1 = models.PositiveIntegerField(choices=Profession.choices, default=Profession.MISSING)
+    profession2 = models.PositiveIntegerField(choices=Profession.choices, default=Profession.MISSING)
     altProfessionExpiryDate = models.DateTimeField()
 
     class Meta:
