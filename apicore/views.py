@@ -29,14 +29,26 @@ class AltView(viewsets.ModelViewSet):
     serializer_class = AltSerializer
     queryset = Alt.objects.all()
 
-    def get_queryset(self):
+    def list(self, request):
+        user = request.query_params.get('user')
+        fields = request.query_params.getlist('fields[]')
         queryset = Alt.objects.all()
-        user = self.request.query_params.get('user')
         if user is None:
             queryset = {}
         else:
             queryset = queryset.filter(user=user)
-        return queryset
+        if not fields or fields[0] == '':
+            fields = ['altId', 'altLevel', 'altName', 'altRealm', 'altRealmId', 'altRealmSlug', 'altClass', 'get_altClass_display', 'altRace', 'get_altRace_display', 'altGender', 'altFaction']
+        alts = []
+        for alt in queryset:
+            temp = []
+            for field in fields:
+                if '_' in field:
+                    temp.append(getattr(alt, field)())
+                else:
+                    temp.append(getattr(alt, field))
+            alts.append(temp)
+        return response.Response(alts)
 
 
 class ProfessionView(viewsets.ModelViewSet):
@@ -58,14 +70,37 @@ class AltProfessionView(viewsets.ModelViewSet):
     serializer_class = AltProfessionSerializer
     queryset = AltProfession.objects.all()
 
-    def get_queryset(self):
-        user = self.request.query_params.get('user')
+    # def get_queryset(self):
+    #     user = self.request.query_params.get('user')
+    #     queryset = Alt.objects.filter(user=user).values_list('altId', flat=True)
+    #     if user is None:
+    #         queryset = {}
+    #     else:
+    #         queryset = AltProfession.objects.filter(alt__in=queryset)
+    #     return queryset
+
+    def list(self, request):
+        user = request.query_params.get('user')
+        fields = request.query_params.getlist('fields[]')
         queryset = Alt.objects.filter(user=user).values_list('altId', flat=True)
         if user is None:
             queryset = {}
         else:
-            queryset = AltProfession.objects.filter(alt__in=queryset)
-        return queryset
+            queryset = AltProfession.objects.filter(alt__in=queryset).select_related('alt')
+        if not fields or fields[0] == '':
+            fields = ['.altName', '.altRealm', 'profession1', 'get_profession1_display', 'profession2', 'get_profession2_display']
+        alts = []
+        for alt in queryset:
+            temp = []
+            for field in fields:
+                if '_' in field:
+                    temp.append(getattr(alt, field)())
+                elif '.' in field:
+                    temp.append(getattr(alt.alt, field[1:]))
+                else:
+                    temp.append(getattr(alt, field))
+            alts.append(temp)
+        return response.Response(alts)
 
 
 class AltProfessionDataView(viewsets.ModelViewSet):
@@ -96,24 +131,26 @@ class AltProfessionDataView(viewsets.ModelViewSet):
     #     # return queryset1
 
     def list(self, request):
-        if self.request.query_params.get('alt') is not None:
+        if request.query_params.get('alt') is not None:
             tiers = {}
-            alt = self.request.query_params.get('alt')
-            profession = self.request.query_params.get('profession')
+            alt = Alt.objects.filter(altName=request.query_params.get('alt'), altRealm=request.query_params.get('realm'))[:1]
+            profession = Profession.objects.filter(professionName=request.query_params.get('profession'))[:1]
             queryset = AltProfessionData.objects.select_related('profession', 'professionTier', 'professionRecipe').all()
-            # queryset = AltProfessionData.objects.all()
-            queryset = queryset.filter(alt=alt, profession=profession)
-            # queryset1 = queryset.filter(alt=alt, profession=profession)
+            queryset = queryset.filter(alt=alt[0].altId, profession=profession[0].professionId)
             for entry in queryset:
                 try:
                     tiers[entry.professionTier.tierName].append(entry.professionRecipe.recipeName)
                 except KeyError:
                     tiers[entry.professionTier.tierName] = [entry.professionRecipe.recipeName]
             queryset = list(map(list, tiers.items()))
+            for key, value in queryset:
+                value = value.sort()
+            print(queryset[-1][0])
+            if 'Shadowlands' in queryset[-1][0]:
+                queryset.insert(0, queryset.pop())
         else:
             queryset = {}
         return response.Response(queryset)
-        # return queryset1
 
 
 class AltAchievementView(viewsets.ModelViewSet):
