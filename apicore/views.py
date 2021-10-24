@@ -1,7 +1,7 @@
 from django.shortcuts import render, redirect
 from rest_framework import viewsets, views, response
-from .serializers import FazzToolsUserSerializer, AltSerializer, ProfessionSerializer, ProfessionTierSerializer, ProfessionRecipeSerializer, AltProfessionSerializer, AltProfessionDataSerializer, AltAchievementSerializer, AltQuestCompletedSerializer, AltMediaSerializer, EquipmentSerializer, AltEquipmentSerializer
-from .models import FazzToolsUser, Alt, Profession, ProfessionTier, ProfessionRecipe, AltProfession, AltProfessionData, AltAchievement, AltQuestCompleted, AltMedia, Equipment, AltEquipment
+from .serializers import FazzToolsUserSerializer, AltSerializer, ProfessionSerializer, ProfessionTierSerializer, ProfessionRecipeSerializer, AltProfessionSerializer, AltProfessionDataSerializer, EquipmentSerializer, AltEquipmentSerializer, AltEquipmentDataSerializer
+from .models import FazzToolsUser, Alt, Profession, ProfessionTier, ProfessionRecipe, AltProfession, AltProfessionData, Equipment, AltEquipment, AltEquipmentData
 import requests
 from django.utils import timezone
 import datetime
@@ -36,7 +36,7 @@ class AltView(viewsets.ModelViewSet):
         if user is None:
             queryset = {}
         else:
-            queryset = queryset.filter(user=user)
+            queryset = queryset.filter(user=user).order_by('-altLevel')
         if not fields or fields[0] == '':
             fields = ['altId', 'altLevel', 'altName', 'altRealm', 'altRealmId', 'altRealmSlug', 'altClass', 'get_altClass_display', 'altRace', 'get_altRace_display', 'altGender', 'altFaction']
         alts = []
@@ -70,15 +70,6 @@ class AltProfessionView(viewsets.ModelViewSet):
     serializer_class = AltProfessionSerializer
     queryset = AltProfession.objects.all()
 
-    # def get_queryset(self):
-    #     user = self.request.query_params.get('user')
-    #     queryset = Alt.objects.filter(user=user).values_list('altId', flat=True)
-    #     if user is None:
-    #         queryset = {}
-    #     else:
-    #         queryset = AltProfession.objects.filter(alt__in=queryset)
-    #     return queryset
-
     def list(self, request):
         user = request.query_params.get('user')
         fields = request.query_params.getlist('fields[]')
@@ -86,7 +77,7 @@ class AltProfessionView(viewsets.ModelViewSet):
         if user is None:
             queryset = {}
         else:
-            queryset = AltProfession.objects.filter(alt__in=queryset).select_related('alt')
+            queryset = AltProfession.objects.filter(alt__in=queryset).select_related('alt').order_by('-alt__altLevel')
         if not fields or fields[0] == '':
             fields = ['.altName', '.altRealm', 'profession1', 'get_profession1_display', 'profession2', 'get_profession2_display']
         alts = []
@@ -107,29 +98,6 @@ class AltProfessionDataView(viewsets.ModelViewSet):
     serializer_class = AltProfessionDataSerializer
     queryset = AltProfessionData.objects.all()
 
-    # def get_queryset(self):
-    #     if self.request.query_params.get('alt') is not None:
-    #         tiers = {}
-    #         alt = self.request.query_params.get('alt')
-    #         profession = self.request.query_params.get('profession')
-    #         queryset = AltProfessionData.objects.select_related('profession', 'professionTier', 'professionRecipe').all()
-    #         # queryset = AltProfessionData.objects.all()
-    #         queryset = queryset.filter(alt=alt, profession=profession)
-    #         # queryset1 = queryset.filter(alt=alt, profession=profession)
-    #         print('1')
-    #         # for entry in queryset:
-    #         #     try:
-    #         #         print('2')
-    #         #         tiers[entry.professionTier.tierName].append(entry.professionRecipe)
-    #         #     except KeyError:
-    #         #         print('3')
-    #         #         tiers[entry.professionTier.tierName] = [entry.professionRecipe]
-    #         # queryset = tiers
-    #     else:
-    #         queryset = {}
-    #     return queryset
-    #     # return queryset1
-
     def list(self, request):
         if request.query_params.get('alt') is not None:
             tiers = {}
@@ -145,27 +113,11 @@ class AltProfessionDataView(viewsets.ModelViewSet):
             queryset = list(map(list, tiers.items()))
             for key, value in queryset:
                 value = value.sort()
-            print(queryset[-1][0])
             if 'Shadowlands' in queryset[-1][0]:
                 queryset.insert(0, queryset.pop())
         else:
             queryset = {}
         return response.Response(queryset)
-
-
-class AltAchievementView(viewsets.ModelViewSet):
-    serializer_class = AltAchievementSerializer
-    queryset = AltAchievement.objects.all()
-
-
-class AltQuestCompletedView(viewsets.ModelViewSet):
-    serializer_class = AltQuestCompletedSerializer
-    queryset = AltQuestCompleted.objects.all()
-
-
-class AltMediaView(viewsets.ModelViewSet):
-    serializer_class = AltMediaSerializer
-    queryset = AltMedia.objects.all()
 
 
 class EquipmentView(viewsets.ModelViewSet):
@@ -176,6 +128,11 @@ class EquipmentView(viewsets.ModelViewSet):
 class AltEquipmentView(viewsets.ModelViewSet):
     serializer_class = AltEquipmentSerializer
     queryset = AltEquipment.objects.all()
+
+
+class AltEquipmentDataView(viewsets.ModelViewSet):
+    serializer_class = AltEquipmentDataSerializer
+    queryset = AltEquipmentData.objects.all()
 
 
 class BnetLogin(viewsets.ViewSet):
@@ -254,83 +211,200 @@ class ScanAlt(viewsets.ViewSet):
                 for alt in old_alts:
                     alts.append(alt.altId)
             for alt in alts:
-                temp = Alt.objects.get(altId=alt)
-                realm = temp.altRealmSlug
-                name = temp.altName.lower()
+                alt_obj = Alt.objects.get(altId=alt)
+                realm = alt_obj.altRealmSlug
+                name = alt_obj.altName.lower()
                 url = 'https://eu.battle.net/oauth/token?grant_type=client_credentials'
                 params = {'client_id': BLIZZ_CLIENT, 'client_secret': BLIZZ_SECRET}
                 x = requests.post(url, data=params)
                 try:
                     token = x.json()['access_token']
-                    url = 'https://eu.api.blizzard.com/profile/wow/character/' + realm + '/' + name + '/professions'
+                    urls = [
+                        'https://eu.api.blizzard.com/profile/wow/character/' + realm + '/' + name + '/professions',
+                        'https://eu.api.blizzard.com/profile/wow/character/' + realm + '/' + name + '/equipment'
+                    ]
                     myobj = {'access_token': token, 'namespace': 'profile-eu', 'locale': 'en_US'}
-                    y = requests.get(url, params=myobj)
-                    if y.status_code == 200:
-                        alt_profs = []
-                        alt_obj = Alt.objects.get(altId=y.json()['character']['id'])
-                        try:
-                            prof_obj = AltProfession.objects.get(alt=alt_obj)
-                        except AltProfession.DoesNotExist:
-                            prof_obj = AltProfession.objects.create(
-                                alt=alt_obj,
-                                profession1=0,
-                                profession2=0,
-                                altProfessionExpiryDate=timezone.now() + datetime.timedelta(days=30)
-                            )
-                        try:
-                            data = y.json()['primaries']
-                            for prof in data:
-                                alt_profs.append(prof['profession']['id'])
+                    for url in urls:
+                        y = requests.get(url, params=myobj)
+                        if y.status_code == 200:
+                            if 'professions' in url:
+                                alt_profs = []
                                 try:
-                                    obj = Profession.objects.get(professionId=prof['profession']['id'])
-                                except Profession.DoesNotExist:
-                                    obj = Profession.objects.create(
-                                        professionId=prof['profession']['id'],
-                                        professionName=prof['profession']['name']
+                                    prof_obj = AltProfession.objects.get(alt=alt_obj)
+                                except AltProfession.DoesNotExist:
+                                    prof_obj = AltProfession.objects.create(
+                                        alt=alt_obj,
+                                        profession1=0,
+                                        profession2=0,
+                                        altProfessionExpiryDate=timezone.now() + datetime.timedelta(days=30)
                                     )
-                                for tier in prof['tiers']:
-                                    try:
-                                        obj1 = ProfessionTier.objects.get(tierId=tier['tier']['id'])
-                                    except ProfessionTier.DoesNotExist:
-                                        obj1 = ProfessionTier.objects.create(
-                                            profession=obj,
-                                            tierId=tier['tier']['id'],
-                                            tierName=tier['tier']['name']
-                                        )
-                                    for recipe in tier['known_recipes']:
+                                try:
+                                    data = y.json()['primaries']
+                                    for prof in data:
+                                        alt_profs.append(prof['profession']['id'])
                                         try:
-                                            obj2 = ProfessionRecipe.objects.get(recipeId=recipe['id'])
-                                        except ProfessionRecipe.DoesNotExist:
-                                            obj2 = ProfessionRecipe.objects.create(
-                                                professionTier=obj1,
-                                                recipeId=recipe['id'],
-                                                recipeName=recipe['name']
+                                            obj = Profession.objects.get(professionId=prof['profession']['id'])
+                                        except Profession.DoesNotExist:
+                                            obj = Profession.objects.create(
+                                                professionId=prof['profession']['id'],
+                                                professionName=prof['profession']['name']
+                                            )
+                                        for tier in prof['tiers']:
+                                            try:
+                                                obj1 = ProfessionTier.objects.get(tierId=tier['tier']['id'])
+                                            except ProfessionTier.DoesNotExist:
+                                                obj1 = ProfessionTier.objects.create(
+                                                    profession=obj,
+                                                    tierId=tier['tier']['id'],
+                                                    tierName=tier['tier']['name']
+                                                )
+                                            for recipe in tier['known_recipes']:
+                                                try:
+                                                    obj2 = ProfessionRecipe.objects.get(recipeId=recipe['id'])
+                                                except ProfessionRecipe.DoesNotExist:
+                                                    obj2 = ProfessionRecipe.objects.create(
+                                                        professionTier=obj1,
+                                                        recipeId=recipe['id'],
+                                                        recipeName=recipe['name']
+                                                    )
+                                                try:
+                                                    obj3 = AltProfessionData.objects.get(alt=prof_obj, profession=obj, professionTier=obj1, professionRecipe=obj2)
+                                                    obj3.altProfessionDataExpiryDate = timezone.now() + datetime.timedelta(days=30)
+                                                    obj3.save()
+                                                except AltProfessionData.DoesNotExist:
+                                                    obj3 = AltProfessionData.objects.create(
+                                                        alt=prof_obj,
+                                                        profession=obj,
+                                                        professionTier=obj1,
+                                                        professionRecipe=obj2,
+                                                        altProfessionDataExpiryDate=timezone.now() + datetime.timedelta(days=30)
+                                                    )
+                                except KeyError as e:
+                                    print(e)
+                                while len(alt_profs) < 2:
+                                    alt_profs.append(0)
+                                old_alt_profs = [prof_obj.profession1, prof_obj.profession2]
+                                for prof in old_alt_profs:
+                                    if prof not in alt_profs:
+                                        print('{} : changes'.format(prof))
+                                        AltProfessionData.objects.filter(alt=prof_obj, profession=prof).delete()
+                                # obj4 = AltProfession.objects.get(alt=alt_obj)
+                                prof_obj.profession1 = alt_profs[0]
+                                prof_obj.profession2 = alt_profs[1]
+                                prof_obj.altProfessionExpiryDate = timezone.now() + datetime.timedelta(days=30)
+                                prof_obj.save()
+                            elif 'equipment' in url:
+                                alt_equipment = {}
+                                try:
+                                    alt_equip_obj = AltEquipment.objects.get(alt=alt_obj)
+                                except AltEquipment.DoesNotExist:
+                                    alt_equip_obj = AltEquipment.objects.create(
+                                        alt=alt_obj,
+                                        head=0,
+                                        neck=0,
+                                        shoulder=0,
+                                        back=0,
+                                        chest=0,
+                                        tabard=0,
+                                        shirt=0,
+                                        wrist=0,
+                                        hands=0,
+                                        belt=0,
+                                        legs=0,
+                                        feet=0,
+                                        ring1=0,
+                                        ring2=0,
+                                        trinket1=0,
+                                        trinket2=0,
+                                        weapon1=0,
+                                        weapon2=0,
+                                        altEquipmentExpiryDate=timezone.now() + datetime.timedelta(days=30)
+                                    )
+                                try:
+                                    data = y.json()['equipped_items']
+                                    for item in data:
+                                        try:
+                                            obj = Equipment.objects.get(equipmentId=item['item']['id'])
+                                        except Equipment.DoesNotExist:
+                                            stamina = strength = agility = intellect = haste = mastery = vers = crit = 0
+                                            try:
+                                                for stat in item['stats']:
+                                                    if stat['type']['type'] == 'STAMINA':
+                                                        stamina = stat['value']
+                                                    elif stat['type']['type'] == 'STRENGTH':
+                                                        strength = stat['value']
+                                                    elif stat['type']['type'] == 'AGILITY':
+                                                        agility = stat['value']
+                                                    elif stat['type']['type'] == 'INTELLECT':
+                                                        intellect = stat['value']
+                                                    elif stat['type']['type'] == 'HASTE_RATING':
+                                                        haste = stat['value']
+                                                    elif stat['type']['type'] == 'MASTERY_RATING':
+                                                        mastery = stat['value']
+                                                    elif stat['type']['type'] == 'VERSATILITY':
+                                                        vers = stat['value']
+                                                    elif stat['type']['type'] == 'CRIT_RATING':
+                                                        crit = stat['value']
+                                            except KeyError:
+                                                pass
+                                            try:
+                                                armour = item['armor']['value']
+                                            except KeyError:
+                                                armour = 0
+                                            obj = Equipment.objects.create(
+                                                equipmentId=item['item']['id'],
+                                                equipmentName=item['name'],
+                                                stamina=stamina,
+                                                armour=armour,
+                                                strength=strength,
+                                                agility=agility,
+                                                intellect=intellect,
+                                                haste=haste,
+                                                mastery=mastery,
+                                                vers=vers,
+                                                crit=crit,
+                                                equipmentLevel=item['level']['value'],
+                                                equipmentQuality=item['quality']['name'],
+                                                equipmentType=item['item_subclass']['name'],
+                                                equipmentSlot=item['slot']['name'],
+                                                equipmentIcon='not done yet'
                                             )
                                         try:
-                                            obj3 = AltProfessionData.objects.get(alt=prof_obj, profession=obj, professionTier=obj1, professionRecipe=obj2)
-                                            obj3.altProfessionDataExpiryDate = timezone.now() + datetime.timedelta(days=30)
-                                            obj3.save()
-                                        except AltProfessionData.DoesNotExist:
-                                            obj3 = AltProfessionData.objects.create(
-                                                alt=prof_obj,
-                                                profession=obj,
-                                                professionTier=obj1,
-                                                professionRecipe=obj2,
-                                                altProfessionDataExpiryDate=timezone.now() + datetime.timedelta(days=30)
+                                            obj2 = AltEquipmentData.objects.get(alt=alt_equip_obj, equipment=obj)
+                                            obj2.altEquipmentDataExpiryDate = timezone.now() + datetime.timedelta(days=30)
+                                            obj2.save()
+                                        except AltEquipmentData.DoesNotExist:
+                                            obj2 = AltEquipmentData.objects.create(
+                                                alt=alt_equip_obj,
+                                                equipment=obj,
+                                                altEquipmentDataExpiryDate=timezone.now() + datetime.timedelta(days=30)
                                             )
-                        except KeyError:
-                            return response.Response('keyerrordude')
-                        while len(alt_profs) < 2:
-                            alt_profs.append(0)
-                        obj4 = AltProfession.objects.get(alt=alt_obj)
-                        obj4.profession1 = alt_profs[0]
-                        obj4.profession2 = alt_profs[1]
-                        obj4.altProfessionExpiryDate = timezone.now() + datetime.timedelta(days=30)
-                        obj4.save()
-                        return response.Response('done')
-                    else:
-                        return response.Response('donebutnotdone')
+                                        alt_equipment[item['slot']['name'].lower()] = item['item']['id']
+                                except KeyError as e:
+                                    print(e)
+                                print(alt_equipment)
+                                # while len(alt_profs) < 2:
+                                #     alt_profs.append(0)
+                                # old_alt_profs = [prof_obj.profession1, prof_obj.profession2]
+                                # for prof in old_alt_profs:
+                                #     if prof not in alt_profs:
+                                #         print('{} : changes'.format(prof))
+                                #         AltProfessionData.objects.filter(alt=prof_obj, profession=prof).delete()
+                                # obj3 = AltEquipment.objects.get(alt=alt_obj)
+                                print(alt_equip_obj.head)
+                                setattr(alt_equip_obj, 'head', alt_equipment.get('head') or 0)
+                                print(alt_equip_obj.head)
+                                print('###########')
+                                print(alt_equip_obj.shirt)
+                                setattr(alt_equip_obj, 'shirt', alt_equipment.get('shirt') or 0)
+                                print(alt_equip_obj.shirt)
+                                # alt_equip_obj.head = alt_profs[0]
+                                # alt_equip_obj.neck = alt_profs[1]
+                                # alt_equip_obj.altProfessionExpiryDate = timezone.now() + datetime.timedelta(days=30)
+                                # alt_equip_obj.save()
+                            else:
+                                print('donebutnotdone')
                 except Exception as e:
                     print(e)
-                    return response.Response('notdone')
-        return response.Response('notfoundanything')
+            return response.Response('done')
+        return response.Response('nouser')

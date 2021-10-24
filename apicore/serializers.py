@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import FazzToolsUser, Alt, Profession, ProfessionTier, ProfessionRecipe, AltProfession, AltProfessionData, AltAchievement, AltQuestCompleted, AltMedia, Equipment, AltEquipment
+from .models import FazzToolsUser, Alt, Profession, ProfessionTier, ProfessionRecipe, AltProfession, AltProfessionData, Equipment, AltEquipment, AltEquipmentData
 
 
 class FazzToolsUserSerializer(serializers.HyperlinkedModelSerializer):
@@ -44,30 +44,6 @@ class AltProfessionDataSerializer(serializers.ModelSerializer):
         fields = ('alt', 'professionRecipe', 'professionTier', 'profession')
 
 
-class AltAchievementSerializer(serializers.HyperlinkedModelSerializer):
-    alt = serializers.HyperlinkedRelatedField(view_name='alt-detail', queryset=Alt.objects.all())
-
-    class Meta:
-        model = AltAchievement
-        fields = ('alt', 'achievementData', 'altAchievementExpiryDate')
-
-
-class AltQuestCompletedSerializer(serializers.HyperlinkedModelSerializer):
-    alt = serializers.HyperlinkedRelatedField(view_name='alt-detail', queryset=Alt.objects.all())
-
-    class Meta:
-        model = AltQuestCompleted
-        fields = ('alt', 'questCompletedData', 'altQuestCompletedExpiryDate')
-
-
-class AltMediaSerializer(serializers.HyperlinkedModelSerializer):
-    alt = serializers.HyperlinkedRelatedField(view_name='alt-detail', queryset=Alt.objects.all())
-
-    class Meta:
-        model = AltMedia
-        fields = ('alt', 'avatar', 'inset', 'main', 'mainRaw', 'altMediaExpiryDate')
-
-
 class EquipmentSerializer(serializers.HyperlinkedModelSerializer):
     class Meta:
         model = Equipment
@@ -78,3 +54,9 @@ class AltEquipmentSerializer(serializers.HyperlinkedModelSerializer):
     class Meta:
         model = AltEquipment
         fields = ('alt', 'equipment', 'item_level', 'stats', 'slot', 'quality', 'sockets', 'enchants', 'spells', 'azerite', 'altEquipmentExpiryDate')
+
+
+class AltEquipmentDataSerializer(serializers.HyperlinkedModelSerializer):
+    class Meta:
+        model = AltEquipmentData
+        fields = ('alt', 'equipment', 'altEquipmentDataExpiryDate')
