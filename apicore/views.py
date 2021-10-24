@@ -1,7 +1,7 @@
 from django.shortcuts import render, redirect
 from rest_framework import viewsets, views, response
-from .serializers import FazzToolsUserSerializer, AltSerializer, ProfessionSerializer, ProfessionTierSerializer, ProfessionRecipeSerializer, AltProfessionSerializer, AltProfessionDataSerializer, EquipmentSerializer, AltEquipmentSerializer, AltEquipmentDataSerializer
-from .models import FazzToolsUser, Alt, Profession, ProfessionTier, ProfessionRecipe, AltProfession, AltProfessionData, Equipment, AltEquipment, AltEquipmentData
+from .serializers import FazzToolsUserSerializer, AltSerializer, ProfessionSerializer, ProfessionTierSerializer, ProfessionRecipeSerializer, AltProfessionSerializer, AltProfessionDataSerializer, EquipmentSerializer, EquipmentVariantSerializer, AltEquipmentSerializer
+from .models import FazzToolsUser, Alt, Profession, ProfessionTier, ProfessionRecipe, AltProfession, AltProfessionData, Equipment, EquipmentVariant, AltEquipment
 import requests
 from django.utils import timezone
 import datetime
@@ -125,14 +125,51 @@ class EquipmentView(viewsets.ModelViewSet):
     queryset = Equipment.objects.all()
 
 
+class EquipmentVariantView(viewsets.ModelViewSet):
+    serializer_class = EquipmentVariantSerializer
+    queryset = EquipmentVariant.objects.all()
+
+
 class AltEquipmentView(viewsets.ModelViewSet):
     serializer_class = AltEquipmentSerializer
     queryset = AltEquipment.objects.all()
 
-
-class AltEquipmentDataView(viewsets.ModelViewSet):
-    serializer_class = AltEquipmentDataSerializer
-    queryset = AltEquipmentData.objects.all()
+    def list(self, request):
+        user = request.query_params.get('user')
+        fields = request.query_params.getlist('fields[]')
+        queryset = Alt.objects.filter(user=user).values_list('altId', flat=True)
+        extra_queryset = EquipmentVariant.objects.all()
+        if user is None:
+            queryset = {}
+        else:
+            queryset = AltEquipment.objects.filter(alt__in=queryset).select_related('alt').order_by('-alt__altLevel')
+        if not fields or fields[0] == '':
+            fields = ['.altName', '.altRealm', 'head', 'neck', 'shoulder', 'back', 'chest', 'tabard', 'shirt', 'wrist', 'hands', 'belt', 'legs', 'feet', 'ring1', 'ring2', 'trinket1', 'trinket2', 'weapon1', 'weapon2']
+        alts = []
+        for alt in queryset:
+            avg_level = []
+            temp = []
+            for field in fields:
+                if '.' in field:
+                    temp.append(getattr(alt.alt, field[1:]))
+                else:
+                    if getattr(alt, field) != '0':
+                        equipment, variant = getattr(alt, field).split(':')
+                        temp3 = extra_queryset.filter(equipment=equipment, variant=variant)
+                        temp.append(temp3[0].level)
+                        if field != 'tabard' and field != 'shirt':
+                            avg_level.append(temp3[0].level)
+                    else:
+                        temp.append(getattr(alt, field))
+                        if field != 'tabard' and field != 'shirt':
+                            avg_level.append(0)
+            if avg_level[-1] == 0:
+                avg_level.pop()
+                avg_level.append(avg_level[-1])
+            avg_level = sum(avg_level) / 16
+            temp.insert(2, '{0:.2f}'.format(avg_level))
+            alts.append(temp)
+        return response.Response(sorted(alts, key=lambda x: float(x[2]), reverse=True))
 
 
 class BnetLogin(viewsets.ViewSet):
@@ -200,7 +237,7 @@ class BnetLogin(viewsets.ViewSet):
 
 class ScanAlt(viewsets.ViewSet):
     def create(self, request):
-        print(request.data)
+        # print(request.data)
         if request.data.get('altId') or request.data.get('userid'):
             alts = []
             if request.data.get('altId'):
@@ -210,7 +247,9 @@ class ScanAlt(viewsets.ViewSet):
                 old_alts = all_alts.filter(user=request.data.get('userid'))
                 for alt in old_alts:
                     alts.append(alt.altId)
-            for alt in alts:
+            total = len(alts)
+            for index, alt in enumerate(alts, start=1):
+                print('Processing: {} of {}'.format(index, total))
                 alt_obj = Alt.objects.get(altId=alt)
                 realm = alt_obj.altRealmSlug
                 name = alt_obj.altName.lower()
@@ -280,13 +319,14 @@ class ScanAlt(viewsets.ViewSet):
                                                         altProfessionDataExpiryDate=timezone.now() + datetime.timedelta(days=30)
                                                     )
                                 except KeyError as e:
-                                    print(e)
+                                    # print(e)
+                                    pass
                                 while len(alt_profs) < 2:
                                     alt_profs.append(0)
                                 old_alt_profs = [prof_obj.profession1, prof_obj.profession2]
                                 for prof in old_alt_profs:
                                     if prof not in alt_profs:
-                                        print('{} : changes'.format(prof))
+                                        # print('{} : changes'.format(prof))
                                         AltProfessionData.objects.filter(alt=prof_obj, profession=prof).delete()
                                 # obj4 = AltProfession.objects.get(alt=alt_obj)
                                 prof_obj.profession1 = alt_profs[0]
@@ -326,6 +366,22 @@ class ScanAlt(viewsets.ViewSet):
                                         try:
                                             obj = Equipment.objects.get(equipmentId=item['item']['id'])
                                         except Equipment.DoesNotExist:
+                                            obj = Equipment.objects.create(
+                                                equipmentId=item['item']['id'],
+                                                equipmentName=item['name'],
+                                                equipmentType=item['item_subclass']['name'],
+                                                equipmentSlot=item['slot']['name'],
+                                                equipmentIcon='not done yet'
+                                            )
+                                        variantCode = ''
+                                        try:
+                                            for bonus in item['bonus_list']:
+                                                variantCode += str(bonus)
+                                        except KeyError:
+                                            variantCode = 'FLUFF'
+                                        try:
+                                            obj1 = EquipmentVariant.objects.get(equipment=obj, variant=variantCode)
+                                        except EquipmentVariant.DoesNotExist:
                                             stamina = strength = agility = intellect = haste = mastery = vers = crit = 0
                                             try:
                                                 for stat in item['stats']:
@@ -351,9 +407,9 @@ class ScanAlt(viewsets.ViewSet):
                                                 armour = item['armor']['value']
                                             except KeyError:
                                                 armour = 0
-                                            obj = Equipment.objects.create(
-                                                equipmentId=item['item']['id'],
-                                                equipmentName=item['name'],
+                                            obj1 = EquipmentVariant.objects.create(
+                                                equipment=obj,
+                                                variant=variantCode,
                                                 stamina=stamina,
                                                 armour=armour,
                                                 strength=strength,
@@ -363,26 +419,28 @@ class ScanAlt(viewsets.ViewSet):
                                                 mastery=mastery,
                                                 vers=vers,
                                                 crit=crit,
-                                                equipmentLevel=item['level']['value'],
-                                                equipmentQuality=item['quality']['name'],
-                                                equipmentType=item['item_subclass']['name'],
-                                                equipmentSlot=item['slot']['name'],
-                                                equipmentIcon='not done yet'
+                                                level=item['level']['value'],
+                                                quality=item['quality']['name']
                                             )
-                                        try:
-                                            obj2 = AltEquipmentData.objects.get(alt=alt_equip_obj, equipment=obj)
-                                            obj2.altEquipmentDataExpiryDate = timezone.now() + datetime.timedelta(days=30)
-                                            obj2.save()
-                                        except AltEquipmentData.DoesNotExist:
-                                            obj2 = AltEquipmentData.objects.create(
-                                                alt=alt_equip_obj,
-                                                equipment=obj,
-                                                altEquipmentDataExpiryDate=timezone.now() + datetime.timedelta(days=30)
-                                            )
-                                        alt_equipment[item['slot']['name'].lower()] = item['item']['id']
+
+                                        # if average_item_level_dict['OFF_HAND'] == 0:
+                                            # average_item_level_dict['OFF_HAND'] = average_item_level_dict['MAIN_HAND']
+                                        # average_item_level = sum(average_item_level_dict.values()) / 16
+
+                                        # try:
+                                        #     obj2 = AltEquipmentData.objects.get(alt=alt_equip_obj, equipmentVariant=obj1)
+                                        #     obj2.altEquipmentDataExpiryDate = timezone.now() + datetime.timedelta(days=30)
+                                        #     obj2.save()
+                                        # except AltEquipmentData.DoesNotExist:
+                                        #     obj2 = AltEquipmentData.objects.create(
+                                        #         alt=alt_equip_obj,
+                                        #         equipmentVariant=obj1,
+                                        #         altEquipmentDataExpiryDate=timezone.now() + datetime.timedelta(days=30)
+                                        #     )
+                                        alt_equipment[item['slot']['name'].lower()] = str(item['item']['id']) + ':' + variantCode
                                 except KeyError as e:
                                     print(e)
-                                print(alt_equipment)
+                                # print(alt_equipment)
                                 # while len(alt_profs) < 2:
                                 #     alt_profs.append(0)
                                 # old_alt_profs = [prof_obj.profession1, prof_obj.profession2]
@@ -391,13 +449,32 @@ class ScanAlt(viewsets.ViewSet):
                                 #         print('{} : changes'.format(prof))
                                 #         AltProfessionData.objects.filter(alt=prof_obj, profession=prof).delete()
                                 # obj3 = AltEquipment.objects.get(alt=alt_obj)
-                                print(alt_equip_obj.head)
+                                # print(alt_equip_obj.head)
                                 setattr(alt_equip_obj, 'head', alt_equipment.get('head') or 0)
-                                print(alt_equip_obj.head)
-                                print('###########')
-                                print(alt_equip_obj.shirt)
+                                setattr(alt_equip_obj, 'neck', alt_equipment.get('neck') or 0)
+                                setattr(alt_equip_obj, 'shoulder', alt_equipment.get('shoulders') or 0)
+                                setattr(alt_equip_obj, 'back', alt_equipment.get('back') or 0)
+                                setattr(alt_equip_obj, 'chest', alt_equipment.get('chest') or 0)
+                                setattr(alt_equip_obj, 'tabard', alt_equipment.get('tabard') or 0)
                                 setattr(alt_equip_obj, 'shirt', alt_equipment.get('shirt') or 0)
-                                print(alt_equip_obj.shirt)
+                                setattr(alt_equip_obj, 'wrist', alt_equipment.get('wrist') or 0)
+                                setattr(alt_equip_obj, 'hands', alt_equipment.get('hands') or 0)
+                                setattr(alt_equip_obj, 'belt', alt_equipment.get('waist') or 0)
+                                setattr(alt_equip_obj, 'legs', alt_equipment.get('legs') or 0)
+                                setattr(alt_equip_obj, 'feet', alt_equipment.get('feet') or 0)
+                                setattr(alt_equip_obj, 'ring1', alt_equipment.get('ring 1') or 0)
+                                setattr(alt_equip_obj, 'ring2', alt_equipment.get('ring 2') or 0)
+                                setattr(alt_equip_obj, 'trinket1', alt_equipment.get('trinket 1') or 0)
+                                setattr(alt_equip_obj, 'trinket2', alt_equipment.get('trinket 2') or 0)
+                                setattr(alt_equip_obj, 'weapon1', alt_equipment.get('main hand') or 0)
+                                setattr(alt_equip_obj, 'weapon2', alt_equipment.get('off hand') or 0)
+                                # print(alt_equip_obj.head)
+                                # print('###########')
+                                # print(alt_equip_obj.shirt)
+                                # setattr(alt_equip_obj, 'shirt', alt_equipment.get('shirt') or 0)
+                                # print(alt_equip_obj.shirt)
+                                alt_equip_obj.save()
+                                # print('### Processing ###')
                                 # alt_equip_obj.head = alt_profs[0]
                                 # alt_equip_obj.neck = alt_profs[1]
                                 # alt_equip_obj.altProfessionExpiryDate = timezone.now() + datetime.timedelta(days=30)

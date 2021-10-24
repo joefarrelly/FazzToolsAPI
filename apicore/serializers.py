@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import FazzToolsUser, Alt, Profession, ProfessionTier, ProfessionRecipe, AltProfession, AltProfessionData, Equipment, AltEquipment, AltEquipmentData
+from .models import FazzToolsUser, Alt, Profession, ProfessionTier, ProfessionRecipe, AltProfession, AltProfessionData, Equipment, EquipmentVariant, AltEquipment
 
 
 class FazzToolsUserSerializer(serializers.HyperlinkedModelSerializer):
@@ -47,16 +47,16 @@ class AltProfessionDataSerializer(serializers.ModelSerializer):
 class EquipmentSerializer(serializers.HyperlinkedModelSerializer):
     class Meta:
         model = Equipment
-        fields = ('item_id', 'name', 'slot', 'armour_type', 'icon')
+        fields = ('equipmentId', 'equipmentName', 'equipmentType', 'equipmentSlot', 'equipmentIcon')
 
 
-class AltEquipmentSerializer(serializers.HyperlinkedModelSerializer):
+class EquipmentVariantSerializer(serializers.HyperlinkedModelSerializer):
+    class Meta:
+        model = EquipmentVariant
+        fields = ('equipment', 'variant', 'stamina', 'armour', 'strength', 'agility', 'intellect', 'haste', 'mastery', 'vers', 'crit', 'level', 'quality')
+
+
+class AltEquipmentSerializer(serializers.ModelSerializer):
     class Meta:
         model = AltEquipment
-        fields = ('alt', 'equipment', 'item_level', 'stats', 'slot', 'quality', 'sockets', 'enchants', 'spells', 'azerite', 'altEquipmentExpiryDate')
-
-
-class AltEquipmentDataSerializer(serializers.HyperlinkedModelSerializer):
-    class Meta:
-        model = AltEquipmentData
-        fields = ('alt', 'equipment', 'altEquipmentDataExpiryDate')
+        fields = ('alt', 'head', 'neck', 'shoulder', 'back', 'chest', 'tabard', 'shirt', 'wrist', 'hands', 'belt', 'legs', 'feet', 'ring1', 'ring2', 'trinket1', 'trinket2', 'weapon1', 'weapon2', 'altEquipmentExpiryDate')

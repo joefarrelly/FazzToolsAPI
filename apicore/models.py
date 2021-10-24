@@ -158,59 +158,9 @@ class AltProfessionData(models.Model):
         ]
 
 
-# class AltAchievement(models.Model):
-#     alt = models.OneToOneField(Alt, on_delete=models.CASCADE, primary_key=True)
-#     achievementData = models.JSONField()
-#     altAchievementExpiryDate = models.DateTimeField()
-
-#     class Meta:
-#         db_table = 'ft_altachievement'
-
-#     def __str__(self):
-#         return '%s - %s' % (self.alt.altName, self.alt.altRealm)
-
-
-# class AltQuestCompleted(models.Model):
-#     alt = models.OneToOneField(Alt, on_delete=models.CASCADE, primary_key=True)
-#     questCompletedData = models.JSONField()
-#     altQuestCompletedExpiryDate = models.DateTimeField()
-
-#     class Meta:
-#         db_table = 'ft_altquestcompleted'
-
-#     def __str__(self):
-#         return '%s - %s' % (self.alt.altName, self.alt.altRealm)
-
-
-# class AltMedia(models.Model):
-#     alt = models.OneToOneField(Alt, on_delete=models.CASCADE, primary_key=True)
-#     avatar = models.CharField(max_length=100, default=None)
-#     inset = models.CharField(max_length=100, default=None)
-#     main = models.CharField(max_length=100, default=None)
-#     mainRaw = models.CharField(max_length=100, default=None)
-#     altMediaExpiryDate = models.DateTimeField()
-
-#     class Meta:
-#         db_table = 'ft_altmedia'
-
-#     def __str__(self):
-#         return '%s - %s' % (self.alt.altName, self.alt.altRealm)
-
-
 class Equipment(models.Model):
     equipmentId = models.PositiveIntegerField(primary_key=True)
     equipmentName = models.CharField(max_length=80)
-    stamina = models.PositiveSmallIntegerField()
-    armour = models.PositiveSmallIntegerField()
-    strength = models.PositiveSmallIntegerField()
-    agility = models.PositiveSmallIntegerField()
-    intellect = models.PositiveSmallIntegerField()
-    haste = models.PositiveSmallIntegerField()
-    mastery = models.PositiveSmallIntegerField()
-    vers = models.PositiveSmallIntegerField()
-    crit = models.PositiveSmallIntegerField()
-    equipmentLevel = models.PositiveSmallIntegerField()
-    equipmentQuality = models.CharField(max_length=20)
     equipmentType = models.CharField(max_length=20)
     equipmentSlot = models.CharField(max_length=20)
     equipmentIcon = models.CharField(max_length=100)
@@ -222,40 +172,52 @@ class Equipment(models.Model):
         return '%s - %s' % (self.equipmentId, self.equipmentName)
 
 
+class EquipmentVariant(models.Model):
+    equipment = models.ForeignKey(Equipment, on_delete=models.CASCADE)
+    variant = models.CharField(max_length=32)
+    stamina = models.PositiveSmallIntegerField()
+    armour = models.PositiveSmallIntegerField()
+    strength = models.PositiveSmallIntegerField()
+    agility = models.PositiveSmallIntegerField()
+    intellect = models.PositiveSmallIntegerField()
+    haste = models.PositiveSmallIntegerField()
+    mastery = models.PositiveSmallIntegerField()
+    vers = models.PositiveSmallIntegerField()
+    crit = models.PositiveSmallIntegerField()
+    level = models.PositiveSmallIntegerField()
+    quality = models.CharField(max_length=20)
+
+    class Meta:
+        db_table = 'ft_equipmentvariant'
+        constraints = [
+            models.UniqueConstraint(fields=['equipment', 'variant'], name='unique_equipmentvariant')
+        ]
+
+
 class AltEquipment(models.Model):
     alt = models.OneToOneField(Alt, on_delete=models.CASCADE, primary_key=True)
-    head = models.PositiveSmallIntegerField()
-    neck = models.PositiveSmallIntegerField()
-    shoulder = models.PositiveSmallIntegerField()
-    back = models.PositiveSmallIntegerField()
-    chest = models.PositiveSmallIntegerField()
-    tabard = models.PositiveSmallIntegerField()
-    shirt = models.PositiveSmallIntegerField()
-    wrist = models.PositiveSmallIntegerField()
-    hands = models.PositiveSmallIntegerField()
-    belt = models.PositiveSmallIntegerField()
-    legs = models.PositiveSmallIntegerField()
-    feet = models.PositiveSmallIntegerField()
-    ring1 = models.PositiveSmallIntegerField()
-    ring2 = models.PositiveSmallIntegerField()
-    trinket1 = models.PositiveSmallIntegerField()
-    trinket2 = models.PositiveSmallIntegerField()
-    weapon1 = models.PositiveSmallIntegerField()
-    weapon2 = models.PositiveSmallIntegerField()
+    head = models.CharField(max_length=40)
+    neck = models.CharField(max_length=40)
+    shoulder = models.CharField(max_length=40)
+    back = models.CharField(max_length=40)
+    chest = models.CharField(max_length=40)
+    tabard = models.CharField(max_length=40)
+    shirt = models.CharField(max_length=40)
+    wrist = models.CharField(max_length=40)
+    hands = models.CharField(max_length=40)
+    belt = models.CharField(max_length=40)
+    legs = models.CharField(max_length=40)
+    feet = models.CharField(max_length=40)
+    ring1 = models.CharField(max_length=40)
+    ring2 = models.CharField(max_length=40)
+    trinket1 = models.CharField(max_length=40)
+    trinket2 = models.CharField(max_length=40)
+    weapon1 = models.CharField(max_length=40)
+    weapon2 = models.CharField(max_length=40)
     altEquipmentExpiryDate = models.DateTimeField()
 
     class Meta:
         db_table = 'ft_altequipment'
 
-
-class AltEquipmentData(models.Model):
-    alt = models.ForeignKey(AltEquipment, on_delete=models.CASCADE)
-    equipment = models.ForeignKey(Equipment, on_delete=models.CASCADE)
-
-    altEquipmentDataExpiryDate = models.DateTimeField()
-
-    class Meta:
-        db_table = 'ft_altequipmentdata'
-        constraints = [
-            models.UniqueConstraint(fields=['alt', 'equipment'], name='unique_altequipmentdata')
-        ]
+    def __str__(self):
+        return '%s - %s' % (self.alt.altName, self.alt.altRealm)
