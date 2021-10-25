@@ -7,6 +7,7 @@ from django.utils import timezone
 import datetime
 import hashlib
 import hmac
+from ratelimit import limits, sleep_and_retry
 
 import environ
 
@@ -106,11 +107,13 @@ class AltProfessionDataView(viewsets.ModelViewSet):
             queryset = AltProfessionData.objects.select_related('profession', 'professionTier', 'professionRecipe').all()
             queryset = queryset.filter(alt=alt[0].altId, profession=profession[0].professionId)
             for entry in queryset:
+                # print(entry)
                 try:
-                    tiers[entry.professionTier.tierName].append(entry.professionRecipe.recipeName)
+                    tiers[entry.professionTier.tierName].append([entry.professionRecipe.recipeName, entry.professionRecipe.recipeRank, entry.professionRecipe.recipeCraftedQuantity])
                 except KeyError:
-                    tiers[entry.professionTier.tierName] = [entry.professionRecipe.recipeName]
+                    tiers[entry.professionTier.tierName] = [[entry.professionRecipe.recipeName, entry.professionRecipe.recipeRank, entry.professionRecipe.recipeCraftedQuantity]]
             queryset = list(map(list, tiers.items()))
+            # print(queryset)
             for key, value in queryset:
                 value = value.sort()
             if 'Shadowlands' in queryset[-1][0]:
@@ -236,6 +239,8 @@ class BnetLogin(viewsets.ViewSet):
 
 
 class ScanAlt(viewsets.ViewSet):
+    @sleep_and_retry
+    @limits(calls=100, period=1)
     def create(self, request):
         # print(request.data)
         if request.data.get('altId') or request.data.get('userid'):
@@ -251,6 +256,8 @@ class ScanAlt(viewsets.ViewSet):
             for index, alt in enumerate(alts, start=1):
                 print('Processing: {} of {}'.format(index, total))
                 alt_obj = Alt.objects.get(altId=alt)
+                # if alt_obj.altName != 'Fazziest':
+                #     continue
                 realm = alt_obj.altRealmSlug
                 name = alt_obj.altName.lower()
                 url = 'https://eu.battle.net/oauth/token?grant_type=client_credentials'
@@ -263,10 +270,12 @@ class ScanAlt(viewsets.ViewSet):
                         'https://eu.api.blizzard.com/profile/wow/character/' + realm + '/' + name + '/equipment'
                     ]
                     myobj = {'access_token': token, 'namespace': 'profile-eu', 'locale': 'en_US'}
+                    dataobj = {'access_token': token, 'locale': 'en_US'}
                     for url in urls:
                         y = requests.get(url, params=myobj)
                         if y.status_code == 200:
                             if 'professions' in url:
+                                print('profession pending')
                                 alt_profs = []
                                 try:
                                     prof_obj = AltProfession.objects.get(alt=alt_obj)
@@ -289,6 +298,8 @@ class ScanAlt(viewsets.ViewSet):
                                                 professionName=prof['profession']['name']
                                             )
                                         for tier in prof['tiers']:
+                                            # print(tier['tier']['name'])
+                                            # print(len(prof['tiers']))
                                             try:
                                                 obj1 = ProfessionTier.objects.get(tierId=tier['tier']['id'])
                                             except ProfessionTier.DoesNotExist:
@@ -297,27 +308,47 @@ class ScanAlt(viewsets.ViewSet):
                                                     tierId=tier['tier']['id'],
                                                     tierName=tier['tier']['name']
                                                 )
-                                            for recipe in tier['known_recipes']:
-                                                try:
-                                                    obj2 = ProfessionRecipe.objects.get(recipeId=recipe['id'])
-                                                except ProfessionRecipe.DoesNotExist:
-                                                    obj2 = ProfessionRecipe.objects.create(
-                                                        professionTier=obj1,
-                                                        recipeId=recipe['id'],
-                                                        recipeName=recipe['name']
-                                                    )
-                                                try:
-                                                    obj3 = AltProfessionData.objects.get(alt=prof_obj, profession=obj, professionTier=obj1, professionRecipe=obj2)
-                                                    obj3.altProfessionDataExpiryDate = timezone.now() + datetime.timedelta(days=30)
-                                                    obj3.save()
-                                                except AltProfessionData.DoesNotExist:
-                                                    obj3 = AltProfessionData.objects.create(
-                                                        alt=prof_obj,
-                                                        profession=obj,
-                                                        professionTier=obj1,
-                                                        professionRecipe=obj2,
-                                                        altProfessionDataExpiryDate=timezone.now() + datetime.timedelta(days=30)
-                                                    )
+                                            try:
+                                                for recipe in tier['known_recipes']:
+                                                    try:
+                                                        obj2 = ProfessionRecipe.objects.get(recipeId=recipe['id'])
+                                                    except ProfessionRecipe.DoesNotExist:
+                                                        try:
+                                                            z = requests.get(recipe['key']['href'], params=dataobj)
+                                                            recipeData = z.json()
+                                                        except Exception as e:
+                                                            print(e)
+                                                        # print(recipeData['rank'])
+                                                        # print(recipeData['crafted_quantity']['value'])
+                                                        try:
+                                                            rank = recipeData['rank']
+                                                        except Exception:
+                                                            rank = 1
+                                                        try:
+                                                            quantity = recipeData['crafted_quantity']['value']
+                                                        except Exception:
+                                                            quantity = 1
+                                                        obj2 = ProfessionRecipe.objects.create(
+                                                            professionTier=obj1,
+                                                            recipeId=recipe['id'],
+                                                            recipeName=recipe['name'],
+                                                            recipeRank=rank,
+                                                            recipeCraftedQuantity=quantity
+                                                        )
+                                                    try:
+                                                        obj3 = AltProfessionData.objects.get(alt=prof_obj, profession=obj, professionTier=obj1, professionRecipe=obj2)
+                                                        obj3.altProfessionDataExpiryDate = timezone.now() + datetime.timedelta(days=30)
+                                                        obj3.save()
+                                                    except AltProfessionData.DoesNotExist:
+                                                        obj3 = AltProfessionData.objects.create(
+                                                            alt=prof_obj,
+                                                            profession=obj,
+                                                            professionTier=obj1,
+                                                            professionRecipe=obj2,
+                                                            altProfessionDataExpiryDate=timezone.now() + datetime.timedelta(days=30)
+                                                        )
+                                            except KeyError as e:
+                                                pass
                                 except KeyError as e:
                                     # print(e)
                                     pass
@@ -334,6 +365,7 @@ class ScanAlt(viewsets.ViewSet):
                                 prof_obj.altProfessionExpiryDate = timezone.now() + datetime.timedelta(days=30)
                                 prof_obj.save()
                             elif 'equipment' in url:
+                                print('equipment pending')
                                 alt_equipment = {}
                                 try:
                                     alt_equip_obj = AltEquipment.objects.get(alt=alt_obj)
@@ -483,5 +515,5 @@ class ScanAlt(viewsets.ViewSet):
                                 print('donebutnotdone')
                 except Exception as e:
                     print(e)
-            return response.Response('done')
+            return response.Response(timezone.now())
         return response.Response('nouser')

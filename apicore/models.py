@@ -107,6 +107,8 @@ class ProfessionTier(models.Model):
 class ProfessionRecipe(models.Model):
     recipeId = models.PositiveSmallIntegerField(primary_key=True)
     recipeName = models.CharField(max_length=50)
+    recipeRank = models.PositiveSmallIntegerField()
+    recipeCraftedQuantity = models.PositiveIntegerField()
 
     professionTier = models.ForeignKey(ProfessionTier, on_delete=models.CASCADE)
 
