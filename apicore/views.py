@@ -1,13 +1,19 @@
 from django.shortcuts import render, redirect
 from rest_framework import viewsets, views, response
-from .serializers import FazzToolsUserSerializer, AltSerializer, ProfessionSerializer, ProfessionTierSerializer, ProfessionRecipeSerializer, AltProfessionSerializer, AltProfessionDataSerializer, EquipmentSerializer, EquipmentVariantSerializer, AltEquipmentSerializer
-from .models import FazzToolsUser, Alt, Profession, ProfessionTier, ProfessionRecipe, AltProfession, AltProfessionData, Equipment, EquipmentVariant, AltEquipment
+# from .serializers import FazzToolsUserSerializer, AltSerializer, ProfessionSerializer, ProfessionTierSerializer, ProfessionRecipeSerializer, AltProfessionSerializer, AltProfessionDataSerializer, EquipmentSerializer, EquipmentVariantSerializer, AltEquipmentSerializer
+from .serializers import *
+# from .models import FazzToolsUser, Alt, Profession, ProfessionTier, ProfessionRecipe, AltProfession, AltProfessionData, Equipment, EquipmentVariant, AltEquipment
+from .models import *
 import requests
 from django.utils import timezone
 import datetime
 import hashlib
 import hmac
 from ratelimit import limits, sleep_and_retry
+
+from types import SimpleNamespace
+from requests.adapters import HTTPAdapter
+from requests.packages.urllib3.util.retry import Retry
 
 import environ
 
@@ -21,19 +27,61 @@ BLIZZ_SECRET = env("BLIZZ_SECRET")
 # Create your views here.
 
 
-class FazzToolsUserView(viewsets.ModelViewSet):
-    serializer_class = FazzToolsUserSerializer
-    queryset = FazzToolsUser.objects.all()
+class DataProfessionView(viewsets.ModelViewSet):
+    serializer_class = DataProfessionSerializer
+    queryset = DataProfession.objects.all()
 
 
-class AltView(viewsets.ModelViewSet):
-    serializer_class = AltSerializer
-    queryset = Alt.objects.all()
+class DataProfessionTierView(viewsets.ModelViewSet):
+    serializer_class = DataProfessionTierSerializer
+    queryset = DataProfessionTier.objects.all()
+
+
+class DataProfessionRecipeView(viewsets.ModelViewSet):
+    serializer_class = DataProfessionRecipeSerializer
+    queryset = DataProfessionRecipe.objects.all()
+
+
+class DataReagentView(viewsets.ModelViewSet):
+    serializer_class = DataReagentSerializer
+    queryset = DataReagent.objects.all()
+
+
+class DataRecipeReagentView(viewsets.ModelViewSet):
+    serializer_class = DataRecipeReagentSerializer
+    queryset = DataRecipeReagent.objects.all()
+
+
+class DataEquipmentView(viewsets.ModelViewSet):
+    serializer_class = DataEquipmentSerializer
+    queryset = DataEquipment.objects.all()
+
+
+class DataEquipmentVariantView(viewsets.ModelViewSet):
+    serializer_class = DataEquipmentVariantSerializer
+    queryset = DataEquipmentVariant.objects.all()
+
+
+#################################################################################
+#                                                                               #
+#                            Data/Profile Separator                             #
+#                                                                               #
+#################################################################################
+
+
+class ProfileFazzToolsUserView(viewsets.ModelViewSet):
+    serializer_class = ProfileFazzToolsUserSerializer
+    queryset = ProfileFazzToolsUser.objects.all()
+
+
+class ProfileAltView(viewsets.ModelViewSet):
+    serializer_class = ProfileAltSerializer
+    queryset = ProfileAlt.objects.all()
 
     def list(self, request):
         user = request.query_params.get('user')
         fields = request.query_params.getlist('fields[]')
-        queryset = Alt.objects.all()
+        queryset = ProfileAlt.objects.all()
         if user is None:
             queryset = {}
         else:
@@ -52,33 +100,18 @@ class AltView(viewsets.ModelViewSet):
         return response.Response(alts)
 
 
-class ProfessionView(viewsets.ModelViewSet):
-    serializer_class = ProfessionSerializer
-    queryset = Profession.objects.all()
-
-
-class ProfessionTierView(viewsets.ModelViewSet):
-    serializer_class = ProfessionTierSerializer
-    queryset = ProfessionTier.objects.all()
-
-
-class ProfessionRecipeView(viewsets.ModelViewSet):
-    serializer_class = ProfessionRecipeSerializer
-    queryset = ProfessionRecipe.objects.all()
-
-
-class AltProfessionView(viewsets.ModelViewSet):
-    serializer_class = AltProfessionSerializer
-    queryset = AltProfession.objects.all()
+class ProfileAltProfessionView(viewsets.ModelViewSet):
+    serializer_class = ProfileAltProfessionSerializer
+    queryset = ProfileAltProfession.objects.all()
 
     def list(self, request):
         user = request.query_params.get('user')
         fields = request.query_params.getlist('fields[]')
-        queryset = Alt.objects.filter(user=user).values_list('altId', flat=True)
+        queryset = ProfileAlt.objects.filter(user=user).values_list('altId', flat=True)
         if user is None:
             queryset = {}
         else:
-            queryset = AltProfession.objects.filter(alt__in=queryset).select_related('alt').order_by('-alt__altLevel')
+            queryset = ProfileAltProfession.objects.filter(alt__in=queryset).select_related('alt').order_by('-alt__altLevel')
         if not fields or fields[0] == '':
             fields = ['.altName', '.altRealm', 'profession1', 'get_profession1_display', 'profession2', 'get_profession2_display']
         alts = []
@@ -95,25 +128,31 @@ class AltProfessionView(viewsets.ModelViewSet):
         return response.Response(alts)
 
 
-class AltProfessionDataView(viewsets.ModelViewSet):
-    serializer_class = AltProfessionDataSerializer
-    queryset = AltProfessionData.objects.all()
+class ProfileAltProfessionDataView(viewsets.ModelViewSet):
+    serializer_class = ProfileAltProfessionDataSerializer
+    queryset = ProfileAltProfessionData.objects.all()
 
     def list(self, request):
         if request.query_params.get('alt') is not None:
             tiers = {}
-            alt = Alt.objects.filter(altName=request.query_params.get('alt'), altRealm=request.query_params.get('realm'))[:1]
-            profession = Profession.objects.filter(professionName=request.query_params.get('profession'))[:1]
-            queryset = AltProfessionData.objects.select_related('profession', 'professionTier', 'professionRecipe').all()
+            alt = ProfileAlt.objects.filter(altName=request.query_params.get('alt'), altRealm=request.query_params.get('realm'))[:1]
+            profession = DataProfession.objects.filter(professionName=request.query_params.get('profession'))[:1]
+            queryset = ProfileAltProfessionData.objects.select_related('profession', 'professionTier', 'professionRecipe').all()
             queryset = queryset.filter(alt=alt[0].altId, profession=profession[0].professionId)
             for entry in queryset:
-                # print(entry)
+                # print(entry.professionRecipe)
+                recipe_reagent = DataRecipeReagent.objects.select_related('reagent').filter(recipe=entry.professionRecipe)
+                # print(recipe_reagent)
+                mats = []
+                for reagent in recipe_reagent:
+                    mats.append([reagent.reagent.reagentName, reagent.quantity])
+                recipe_list = [entry.professionRecipe.recipeName, entry.professionRecipe.recipeRank, entry.professionRecipe.recipeCraftedQuantity]
+                recipe_list.extend(mats)
                 try:
-                    tiers[entry.professionTier.tierName].append([entry.professionRecipe.recipeName, entry.professionRecipe.recipeRank, entry.professionRecipe.recipeCraftedQuantity])
+                    tiers[entry.professionTier.tierName].append(recipe_list)
                 except KeyError:
-                    tiers[entry.professionTier.tierName] = [[entry.professionRecipe.recipeName, entry.professionRecipe.recipeRank, entry.professionRecipe.recipeCraftedQuantity]]
+                    tiers[entry.professionTier.tierName] = [recipe_list]
             queryset = list(map(list, tiers.items()))
-            # print(queryset)
             for key, value in queryset:
                 value = value.sort()
             if 'Shadowlands' in queryset[-1][0]:
@@ -123,29 +162,19 @@ class AltProfessionDataView(viewsets.ModelViewSet):
         return response.Response(queryset)
 
 
-class EquipmentView(viewsets.ModelViewSet):
-    serializer_class = EquipmentSerializer
-    queryset = Equipment.objects.all()
-
-
-class EquipmentVariantView(viewsets.ModelViewSet):
-    serializer_class = EquipmentVariantSerializer
-    queryset = EquipmentVariant.objects.all()
-
-
-class AltEquipmentView(viewsets.ModelViewSet):
-    serializer_class = AltEquipmentSerializer
-    queryset = AltEquipment.objects.all()
+class ProfileAltEquipmentView(viewsets.ModelViewSet):
+    serializer_class = ProfileAltEquipmentSerializer
+    queryset = ProfileAltEquipment.objects.all()
 
     def list(self, request):
         user = request.query_params.get('user')
         fields = request.query_params.getlist('fields[]')
-        queryset = Alt.objects.filter(user=user).values_list('altId', flat=True)
-        extra_queryset = EquipmentVariant.objects.all()
+        queryset = ProfileAlt.objects.filter(user=user).values_list('altId', flat=True)
+        extra_queryset = DataEquipmentVariant.objects.all()
         if user is None:
             queryset = {}
         else:
-            queryset = AltEquipment.objects.filter(alt__in=queryset).select_related('alt').order_by('-alt__altLevel')
+            queryset = ProfileAltEquipment.objects.filter(alt__in=queryset).select_related('alt').order_by('-alt__altLevel')
         if not fields or fields[0] == '':
             fields = ['.altName', '.altRealm', 'head', 'neck', 'shoulder', 'back', 'chest', 'tabard', 'shirt', 'wrist', 'hands', 'belt', 'legs', 'feet', 'ring1', 'ring2', 'trinket1', 'trinket2', 'weapon1', 'weapon2']
         alts = []
@@ -177,7 +206,6 @@ class AltEquipmentView(viewsets.ModelViewSet):
 
 class BnetLogin(viewsets.ViewSet):
     def create(self, request):
-        print(BLIZZ_SECRET)
         if request.data.get('state') == 'blizzardeumz76c':
             url = 'https://eu.battle.net/oauth/token?grant_type=authorization_code'
             params = {'client_id': request.data.get('client_id'), 'client_secret': BLIZZ_SECRET, 'code': request.data.get('code'), 'redirect_uri': 'http://localhost:3000/redirect/'}
@@ -191,9 +219,9 @@ class BnetLogin(viewsets.ViewSet):
                     encoded = str(y.json()['id']).encode()
                     result = hmac.new(HASH_KEY, encoded, hashlib.sha256).hexdigest()
                     try:
-                        user_obj = FazzToolsUser.objects.get(userId=result)
-                    except FazzToolsUser.DoesNotExist:
-                        user_obj = FazzToolsUser.objects.create(
+                        user_obj = ProfileFazzToolsUser.objects.get(userId=result)
+                    except ProfileFazzToolsUser.DoesNotExist:
+                        user_obj = ProfileFazzToolsUser.objects.create(
                             userId=result
                         )
                     altId = []
@@ -203,7 +231,7 @@ class BnetLogin(viewsets.ViewSet):
                         for key in test:
                             altId.append(key['id'])
                             try:
-                                obj = Alt.objects.get(altId=key['id'])
+                                obj = ProfileAlt.objects.get(altId=key['id'])
                                 obj.altLevel = key['level']
                                 obj.altName = key['name']
                                 obj.altRealm = key['realm']['name']
@@ -216,8 +244,8 @@ class BnetLogin(viewsets.ViewSet):
                                 obj.altExpiryDate = timezone.now() + datetime.timedelta(days=30)
                                 obj.user = user_obj
                                 obj.save()
-                            except Alt.DoesNotExist:
-                                Alt.objects.create(
+                            except ProfileAlt.DoesNotExist:
+                                ProfileAlt.objects.create(
                                     altId=key['id'],
                                     altLevel=key['level'],
                                     altName=key['name'],
@@ -238,24 +266,28 @@ class BnetLogin(viewsets.ViewSet):
             return response.Response('error')
 
 
+s = requests.Session()
+retries = Retry(total=3, backoff_factor=1)
+s.mount('https://', HTTPAdapter(max_retries=retries))
+
+
 class ScanAlt(viewsets.ViewSet):
-    @sleep_and_retry
-    @limits(calls=100, period=1)
     def create(self, request):
-        # print(request.data)
+        counter = 0
         if request.data.get('altId') or request.data.get('userid'):
             alts = []
             if request.data.get('altId'):
                 alts.append(request.data.get('altId'))
             elif request.data.get('userid'):
-                all_alts = Alt.objects.all()
+                all_alts = ProfileAlt.objects.all()
                 old_alts = all_alts.filter(user=request.data.get('userid'))
                 for alt in old_alts:
                     alts.append(alt.altId)
             total = len(alts)
             for index, alt in enumerate(alts, start=1):
+                print(counter)
                 print('Processing: {} of {}'.format(index, total))
-                alt_obj = Alt.objects.get(altId=alt)
+                alt_obj = ProfileAlt.objects.get(altId=alt)
                 # if alt_obj.altName != 'Fazziest':
                 #     continue
                 realm = alt_obj.altRealmSlug
@@ -263,6 +295,7 @@ class ScanAlt(viewsets.ViewSet):
                 url = 'https://eu.battle.net/oauth/token?grant_type=client_credentials'
                 params = {'client_id': BLIZZ_CLIENT, 'client_secret': BLIZZ_SECRET}
                 x = requests.post(url, data=params)
+                counter += 1
                 try:
                     token = x.json()['access_token']
                     urls = [
@@ -272,15 +305,16 @@ class ScanAlt(viewsets.ViewSet):
                     myobj = {'access_token': token, 'namespace': 'profile-eu', 'locale': 'en_US'}
                     dataobj = {'access_token': token, 'locale': 'en_US'}
                     for url in urls:
-                        y = requests.get(url, params=myobj)
+                        y = s.get(url, params=myobj, timeout=5)
+                        counter += 1
                         if y.status_code == 200:
                             if 'professions' in url:
                                 print('profession pending')
                                 alt_profs = []
                                 try:
-                                    prof_obj = AltProfession.objects.get(alt=alt_obj)
-                                except AltProfession.DoesNotExist:
-                                    prof_obj = AltProfession.objects.create(
+                                    prof_obj = ProfileAltProfession.objects.get(alt=alt_obj)
+                                except ProfileAltProfession.DoesNotExist:
+                                    prof_obj = ProfileAltProfession.objects.create(
                                         alt=alt_obj,
                                         profession1=0,
                                         profession2=0,
@@ -291,56 +325,55 @@ class ScanAlt(viewsets.ViewSet):
                                     for prof in data:
                                         alt_profs.append(prof['profession']['id'])
                                         try:
-                                            obj = Profession.objects.get(professionId=prof['profession']['id'])
-                                        except Profession.DoesNotExist:
-                                            obj = Profession.objects.create(
-                                                professionId=prof['profession']['id'],
-                                                professionName=prof['profession']['name']
-                                            )
+                                            obj = DataProfession.objects.get(professionId=prof['profession']['id'])
+                                        except DataProfession.DoesNotExist:
+                                            print('Does not exist: {}'.format(prof['profession']['name']))
                                         for tier in prof['tiers']:
-                                            # print(tier['tier']['name'])
-                                            # print(len(prof['tiers']))
                                             try:
-                                                obj1 = ProfessionTier.objects.get(tierId=tier['tier']['id'])
-                                            except ProfessionTier.DoesNotExist:
-                                                obj1 = ProfessionTier.objects.create(
-                                                    profession=obj,
-                                                    tierId=tier['tier']['id'],
-                                                    tierName=tier['tier']['name']
-                                                )
+                                                obj1 = DataProfessionTier.objects.get(tierId=tier['tier']['id'])
+                                            except DataProfessionTier.DoesNotExist:
+                                                print('Does not exist: {}'.format(tier['tier']['name']))
                                             try:
                                                 for recipe in tier['known_recipes']:
                                                     try:
-                                                        obj2 = ProfessionRecipe.objects.get(recipeId=recipe['id'])
-                                                    except ProfessionRecipe.DoesNotExist:
-                                                        try:
-                                                            z = requests.get(recipe['key']['href'], params=dataobj)
-                                                            recipeData = z.json()
-                                                        except Exception as e:
-                                                            print(e)
-                                                        # print(recipeData['rank'])
-                                                        # print(recipeData['crafted_quantity']['value'])
-                                                        try:
-                                                            rank = recipeData['rank']
-                                                        except Exception:
-                                                            rank = 1
-                                                        try:
-                                                            quantity = recipeData['crafted_quantity']['value']
-                                                        except Exception:
-                                                            quantity = 1
-                                                        obj2 = ProfessionRecipe.objects.create(
-                                                            professionTier=obj1,
-                                                            recipeId=recipe['id'],
-                                                            recipeName=recipe['name'],
-                                                            recipeRank=rank,
-                                                            recipeCraftedQuantity=quantity
-                                                        )
+                                                        obj2 = DataProfessionRecipe.objects.get(recipeId=recipe['id'])
+                                                    except DataProfessionRecipe.DoesNotExist:
+                                                        print('Does not exist: {}'.format(recipe['name']))
+
+                                                        recipe_response = limit_call(recipe['key']['href'], params=dataobj)
+                                                        counter += 1
+                                                        if recipe_response.status_code == 200:
+                                                            try:
+                                                                recipe_details = recipe_response.json()
+                                                                try:
+                                                                    rank = recipe_details['rank']
+                                                                except KeyError as e:
+                                                                    rank = 1
+                                                                try:
+                                                                    crafted_quantity = recipe_details['crafted_quantity']['value']
+                                                                except KeyError as e:
+                                                                    crafted_quantity = 1
+                                                                try:
+                                                                    description = recipe_details['description']
+                                                                except KeyError as e:
+                                                                    description = 'None'
+                                                                obj2 = DataProfessionRecipe.objects.create(
+                                                                    tier=obj1,
+                                                                    recipeId=recipe_details['id'],
+                                                                    recipeName=recipe_details['name'],
+                                                                    recipeDescription=description,
+                                                                    recipeCategory='N/A',
+                                                                    recipeRank=rank,
+                                                                    recipeCraftedQuantity=crafted_quantity
+                                                                )
+                                                            except KeyError as e:
+                                                                pass
                                                     try:
-                                                        obj3 = AltProfessionData.objects.get(alt=prof_obj, profession=obj, professionTier=obj1, professionRecipe=obj2)
+                                                        obj3 = ProfileAltProfessionData.objects.get(alt=prof_obj, profession=obj, professionTier=obj1, professionRecipe=obj2)
                                                         obj3.altProfessionDataExpiryDate = timezone.now() + datetime.timedelta(days=30)
                                                         obj3.save()
-                                                    except AltProfessionData.DoesNotExist:
-                                                        obj3 = AltProfessionData.objects.create(
+                                                    except ProfileAltProfessionData.DoesNotExist:
+                                                        obj3 = ProfileAltProfessionData.objects.create(
                                                             alt=prof_obj,
                                                             profession=obj,
                                                             professionTier=obj1,
@@ -350,16 +383,13 @@ class ScanAlt(viewsets.ViewSet):
                                             except KeyError as e:
                                                 pass
                                 except KeyError as e:
-                                    # print(e)
                                     pass
                                 while len(alt_profs) < 2:
                                     alt_profs.append(0)
                                 old_alt_profs = [prof_obj.profession1, prof_obj.profession2]
                                 for prof in old_alt_profs:
                                     if prof not in alt_profs:
-                                        # print('{} : changes'.format(prof))
-                                        AltProfessionData.objects.filter(alt=prof_obj, profession=prof).delete()
-                                # obj4 = AltProfession.objects.get(alt=alt_obj)
+                                        ProfileAltProfessionData.objects.filter(alt=prof_obj, profession=prof).delete()
                                 prof_obj.profession1 = alt_profs[0]
                                 prof_obj.profession2 = alt_profs[1]
                                 prof_obj.altProfessionExpiryDate = timezone.now() + datetime.timedelta(days=30)
@@ -368,9 +398,9 @@ class ScanAlt(viewsets.ViewSet):
                                 print('equipment pending')
                                 alt_equipment = {}
                                 try:
-                                    alt_equip_obj = AltEquipment.objects.get(alt=alt_obj)
-                                except AltEquipment.DoesNotExist:
-                                    alt_equip_obj = AltEquipment.objects.create(
+                                    alt_equip_obj = ProfileAltEquipment.objects.get(alt=alt_obj)
+                                except ProfileAltEquipment.DoesNotExist:
+                                    alt_equip_obj = ProfileAltEquipment.objects.create(
                                         alt=alt_obj,
                                         head=0,
                                         neck=0,
@@ -396,9 +426,9 @@ class ScanAlt(viewsets.ViewSet):
                                     data = y.json()['equipped_items']
                                     for item in data:
                                         try:
-                                            obj = Equipment.objects.get(equipmentId=item['item']['id'])
-                                        except Equipment.DoesNotExist:
-                                            obj = Equipment.objects.create(
+                                            obj = DataEquipment.objects.get(equipmentId=item['item']['id'])
+                                        except DataEquipment.DoesNotExist:
+                                            obj = DataEquipment.objects.create(
                                                 equipmentId=item['item']['id'],
                                                 equipmentName=item['name'],
                                                 equipmentType=item['item_subclass']['name'],
@@ -412,8 +442,8 @@ class ScanAlt(viewsets.ViewSet):
                                         except KeyError:
                                             variantCode = 'FLUFF'
                                         try:
-                                            obj1 = EquipmentVariant.objects.get(equipment=obj, variant=variantCode)
-                                        except EquipmentVariant.DoesNotExist:
+                                            obj1 = DataEquipmentVariant.objects.get(equipment=obj, variant=variantCode)
+                                        except DataEquipmentVariant.DoesNotExist:
                                             stamina = strength = agility = intellect = haste = mastery = vers = crit = 0
                                             try:
                                                 for stat in item['stats']:
@@ -439,7 +469,7 @@ class ScanAlt(viewsets.ViewSet):
                                                 armour = item['armor']['value']
                                             except KeyError:
                                                 armour = 0
-                                            obj1 = EquipmentVariant.objects.create(
+                                            obj1 = DataEquipmentVariant.objects.create(
                                                 equipment=obj,
                                                 variant=variantCode,
                                                 stamina=stamina,
@@ -454,34 +484,9 @@ class ScanAlt(viewsets.ViewSet):
                                                 level=item['level']['value'],
                                                 quality=item['quality']['name']
                                             )
-
-                                        # if average_item_level_dict['OFF_HAND'] == 0:
-                                            # average_item_level_dict['OFF_HAND'] = average_item_level_dict['MAIN_HAND']
-                                        # average_item_level = sum(average_item_level_dict.values()) / 16
-
-                                        # try:
-                                        #     obj2 = AltEquipmentData.objects.get(alt=alt_equip_obj, equipmentVariant=obj1)
-                                        #     obj2.altEquipmentDataExpiryDate = timezone.now() + datetime.timedelta(days=30)
-                                        #     obj2.save()
-                                        # except AltEquipmentData.DoesNotExist:
-                                        #     obj2 = AltEquipmentData.objects.create(
-                                        #         alt=alt_equip_obj,
-                                        #         equipmentVariant=obj1,
-                                        #         altEquipmentDataExpiryDate=timezone.now() + datetime.timedelta(days=30)
-                                        #     )
                                         alt_equipment[item['slot']['name'].lower()] = str(item['item']['id']) + ':' + variantCode
                                 except KeyError as e:
                                     print(e)
-                                # print(alt_equipment)
-                                # while len(alt_profs) < 2:
-                                #     alt_profs.append(0)
-                                # old_alt_profs = [prof_obj.profession1, prof_obj.profession2]
-                                # for prof in old_alt_profs:
-                                #     if prof not in alt_profs:
-                                #         print('{} : changes'.format(prof))
-                                #         AltProfessionData.objects.filter(alt=prof_obj, profession=prof).delete()
-                                # obj3 = AltEquipment.objects.get(alt=alt_obj)
-                                # print(alt_equip_obj.head)
                                 setattr(alt_equip_obj, 'head', alt_equipment.get('head') or 0)
                                 setattr(alt_equip_obj, 'neck', alt_equipment.get('neck') or 0)
                                 setattr(alt_equip_obj, 'shoulder', alt_equipment.get('shoulders') or 0)
@@ -500,20 +505,159 @@ class ScanAlt(viewsets.ViewSet):
                                 setattr(alt_equip_obj, 'trinket2', alt_equipment.get('trinket 2') or 0)
                                 setattr(alt_equip_obj, 'weapon1', alt_equipment.get('main hand') or 0)
                                 setattr(alt_equip_obj, 'weapon2', alt_equipment.get('off hand') or 0)
-                                # print(alt_equip_obj.head)
-                                # print('###########')
-                                # print(alt_equip_obj.shirt)
-                                # setattr(alt_equip_obj, 'shirt', alt_equipment.get('shirt') or 0)
-                                # print(alt_equip_obj.shirt)
                                 alt_equip_obj.save()
-                                # print('### Processing ###')
-                                # alt_equip_obj.head = alt_profs[0]
-                                # alt_equip_obj.neck = alt_profs[1]
-                                # alt_equip_obj.altProfessionExpiryDate = timezone.now() + datetime.timedelta(days=30)
-                                # alt_equip_obj.save()
                             else:
                                 print('donebutnotdone')
                 except Exception as e:
                     print(e)
             return response.Response(timezone.now())
         return response.Response('nouser')
+
+
+def limit_call(url, params):
+    response = s.get(url, params=params, timeout=5)
+    return response
+
+
+class DataScan(viewsets.ViewSet):
+    def create(self, request):
+        if request.data.get('password') == env("DATA_PASSWORD"):
+            url = 'https://eu.battle.net/oauth/token?grant_type=client_credentials'
+            params = {'client_id': BLIZZ_CLIENT, 'client_secret': BLIZZ_SECRET}
+            x = requests.post(url, data=params)
+            try:
+                token = x.json()['access_token']
+                urls = [
+                    'https://eu.api.blizzard.com/data/wow/profession/index',
+                ]
+                dataobj = {'access_token': token, 'namespace': 'static-eu', 'locale': 'en_US'}
+                for url in urls:
+                    y = limit_call(url, params=dataobj)
+                    if y.status_code == 200:
+                        try:
+                            profession_index = y.json()['professions']
+                            for profession in profession_index:
+                                # if profession['name'] != 'Mining':
+                                #     continue
+                                profession_response = limit_call(profession['key']['href'], params=dataobj)
+                                if profession_response.status_code == 200:
+                                    try:
+                                        profession_details = profession_response.json()
+                                        try:
+                                            obj_profession = DataProfession.objects.get(professionId=profession_details['id'])
+                                        except DataProfession.DoesNotExist:
+                                            obj_profession = DataProfession.objects.create(
+                                                professionId=profession_details['id'],
+                                                professionName=profession_details['name'],
+                                                professionDescription=profession_details['description']
+                                            )
+                                    except KeyError as e:
+                                        print(e)
+                                    try:
+                                        tier_index = profession_details['skill_tiers']
+                                        for tier in tier_index:
+                                            print('Processing tier: {}'.format(tier['name']))
+                                            tier_response = limit_call(tier['key']['href'], params=dataobj)
+                                            if tier_response.status_code == 200:
+                                                try:
+                                                    tier_details = tier_response.json()
+                                                    try:
+                                                        obj_tier = DataProfessionTier.objects.get(tierId=tier_details['id'])
+                                                    except DataProfessionTier.DoesNotExist:
+                                                        obj_tier = DataProfessionTier.objects.create(
+                                                            profession=obj_profession,
+                                                            tierId=tier_details['id'],
+                                                            tierName=tier_details['name'],
+                                                            tierMinSkill=tier_details['minimum_skill_level'],
+                                                            tierMaxSkill=tier_details['maximum_skill_level']
+                                                        )
+                                                except KeyError as e:
+                                                    print(e)
+                                                try:
+                                                    category_index = tier_details['categories']
+                                                    for category in category_index:
+                                                        print('Processing category: {}'.format(category['name']))
+                                                        try:
+                                                            recipe_index = category['recipes']
+                                                            for recipe in recipe_index:
+                                                                print('Processing recipe: {}'.format(recipe['name']))
+                                                                recipe_response = limit_call(recipe['key']['href'], params=dataobj)
+                                                                if recipe_response.status_code == 200:
+                                                                    try:
+                                                                        recipe_details = recipe_response.json()
+                                                                        try:
+                                                                            obj_recipe = DataProfessionRecipe.objects.get(recipeId=recipe_details['id'])
+                                                                        except DataProfessionRecipe.DoesNotExist:
+                                                                            try:
+                                                                                rank = recipe_details['rank']
+                                                                            except KeyError as e:
+                                                                                rank = 1
+                                                                            try:
+                                                                                crafted_quantity = recipe_details['crafted_quantity']['value']
+                                                                            except KeyError as e:
+                                                                                crafted_quantity = 1
+                                                                            try:
+                                                                                description = recipe_details['description']
+                                                                            except KeyError as e:
+                                                                                description = 'None'
+                                                                            obj_recipe = DataProfessionRecipe.objects.create(
+                                                                                tier=obj_tier,
+                                                                                recipeId=recipe_details['id'],
+                                                                                recipeName=recipe_details['name'],
+                                                                                recipeDescription=description,
+                                                                                recipeCategory=category['name'],
+                                                                                recipeRank=rank,
+                                                                                recipeCraftedQuantity=crafted_quantity
+                                                                            )
+                                                                    except KeyError as e:
+                                                                        print(e)
+                                                                    try:
+                                                                        reagent_index = recipe_details['reagents']
+                                                                        for reagent in reagent_index:
+                                                                            reagent_response = limit_call(reagent['reagent']['key']['href'], params=dataobj)
+                                                                            if reagent_response.status_code == 200:
+                                                                                try:
+                                                                                    reagent_details = reagent_response.json()
+                                                                                    try:
+                                                                                        obj_reagent = DataReagent.objects.get(reagentId=reagent_details['id'])
+                                                                                    except DataReagent.DoesNotExist:
+                                                                                        obj_reagent = DataReagent.objects.create(
+                                                                                            reagentId=reagent_details['id'],
+                                                                                            reagentName=reagent_details['name'],
+                                                                                            reagentQuality=reagent_details['quality']['name']
+                                                                                        )
+                                                                                except KeyError as e:
+                                                                                    print(e)
+                                                                                try:
+                                                                                    obj_recipereagent = DataRecipeReagent.objects.get(recipe=obj_recipe, reagent=obj_reagent)
+                                                                                except DataRecipeReagent.DoesNotExist:
+                                                                                    obj_recipereagent = DataRecipeReagent.objects.create(
+                                                                                        recipe=obj_recipe,
+                                                                                        reagent=obj_reagent,
+                                                                                        quantity=reagent['quantity']
+                                                                                    )
+                                                                            else:
+                                                                                print(reagent_response.status_code)
+                                                                    except KeyError as e:
+                                                                        print(e)
+                                                                else:
+                                                                    print(recipe_response.status_code)
+                                                        except KeyError as e:
+                                                            print(e)
+                                                except KeyError as e:
+                                                    print(e)
+                                            else:
+                                                print(tier_response.status_code)
+                                    except KeyError as e:
+                                        print(e)
+                                else:
+                                    print(profession_response.status_code)
+                        except KeyError as e:
+                            print(e)
+                    else:
+                        print(y.status_code)
+            except KeyError as e:
+                print(e)
+            return response.Response('Passowrd Correct')
+        else:
+            return response.Response('Incorrect Password')

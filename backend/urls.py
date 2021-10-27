@@ -18,21 +18,30 @@ from django.urls import path, include
 from rest_framework import routers
 from apicore import views
 
-router = routers.DefaultRouter()
-router.register(r'users', views.FazzToolsUserView)
-router.register(r'alts', views.AltView)
-router.register(r'professions', views.ProfessionView)
-router.register(r'professiontiers', views.ProfessionTierView)
-router.register(r'professionrecipes', views.ProfessionRecipeView)
-router.register(r'altprofessions', views.AltProfessionView)
-router.register(r'altprofessiondatas', views.AltProfessionDataView)
-router.register(r'equipments', views.EquipmentView)
-router.register(r'equipmentvariants', views.EquipmentVariantView)
-router.register(r'altequipments', views.AltEquipmentView)
-router.register(r'bnetlogin', views.BnetLogin, 'bnetlogin')
-router.register(r'scanalt', views.ScanAlt, 'scanalt')
+profile = routers.DefaultRouter()
+profile.register(r'users', views.ProfileFazzToolsUserView)
+profile.register(r'alts', views.ProfileAltView)
+profile.register(r'altprofessions', views.ProfileAltProfessionView)
+profile.register(r'altprofessiondatas', views.ProfileAltProfessionDataView)
+profile.register(r'altequipments', views.ProfileAltEquipmentView)
+
+data = routers.DefaultRouter()
+data.register(r'professions', views.DataProfessionView)
+data.register(r'professiontiers', views.DataProfessionTierView)
+data.register(r'professionrecipes', views.DataProfessionRecipeView)
+data.register(r'reagents', views.DataReagentView)
+data.register(r'recipereagents', views.DataRecipeReagentView)
+data.register(r'equipments', views.DataEquipmentView)
+data.register(r'equipmentvariants', views.DataEquipmentVariantView)
+
+custom = routers.DefaultRouter()
+custom.register(r'bnetlogin', views.BnetLogin, 'bnetlogin')
+custom.register(r'scanalt', views.ScanAlt, 'scanalt')
+custom.register(r'datascan', views.DataScan, 'datascan')
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('api/', include(router.urls)),
+    path('api/profile/', include(profile.urls)),
+    path('api/data/', include(data.urls)),
+    path('api/custom/', include(custom.urls)),
 ]

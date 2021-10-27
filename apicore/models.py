@@ -4,14 +4,123 @@ from django.utils.translation import gettext_lazy as _
 # Create your models here.
 
 
-class FazzToolsUser(models.Model):
+class DataProfession(models.Model):
+    professionId = models.PositiveIntegerField(primary_key=True)
+    professionName = models.CharField(max_length=50)
+    professionDescription = models.CharField(max_length=300)
+
+    class Meta:
+        db_table = 'ft_data_profession'
+
+    def __str__(self):
+        return '%s - %s' % (self.professionId, self.professionName)
+
+
+class DataProfessionTier(models.Model):
+    profession = models.ForeignKey(DataProfession, on_delete=models.CASCADE)
+    tierId = models.PositiveSmallIntegerField(primary_key=True)
+    tierName = models.CharField(max_length=100)
+    tierMinSkill = models.PositiveSmallIntegerField()
+    tierMaxSkill = models.PositiveSmallIntegerField()
+
+    class Meta:
+        db_table = 'ft_data_professiontier'
+
+    def __str__(self):
+        return '%s - %s' % (self.tierId, self.tierName)
+
+
+class DataProfessionRecipe(models.Model):
+    tier = models.ForeignKey(DataProfessionTier, on_delete=models.CASCADE)
+    recipeId = models.PositiveSmallIntegerField(primary_key=True)
+    recipeName = models.CharField(max_length=100)
+    recipeDescription = models.CharField(max_length=500)
+    recipeCategory = models.CharField(max_length=100)
+    recipeRank = models.PositiveSmallIntegerField()
+    recipeCraftedQuantity = models.PositiveIntegerField()
+
+    class Meta:
+        db_table = 'ft_data_professionrecipe'
+
+    def __str__(self):
+        return '%s - %s' % (self.recipeId, self.recipeName)
+
+
+class DataReagent(models.Model):
+    reagentId = models.PositiveIntegerField(primary_key=True)
+    reagentName = models.CharField(max_length=100)
+    reagentQuality = models.CharField(max_length=20)
+
+    class Meta:
+        db_table = 'ft_data_reagent'
+
+    def __str__(self):
+        return '%s - %s' % (self.reagentId, self.reagentName)
+
+
+class DataRecipeReagent(models.Model):
+    recipe = models.ForeignKey(DataProfessionRecipe, on_delete=models.CASCADE)
+    reagent = models.ForeignKey(DataReagent, on_delete=models.CASCADE)
+    quantity = models.PositiveSmallIntegerField()
+
+    class Meta:
+        db_table = 'ft_data_recipereagent'
+
+    def __str__(self):
+        return '%s - %s - %s' % (self.recipe.recipeName, self.reagent.reagentName, self.quantity)
+
+
+class DataEquipment(models.Model):
+    equipmentId = models.PositiveIntegerField(primary_key=True)
+    equipmentName = models.CharField(max_length=80)
+    equipmentType = models.CharField(max_length=20)
+    equipmentSlot = models.CharField(max_length=20)
+    equipmentIcon = models.CharField(max_length=100)
+
+    class Meta:
+        db_table = 'ft_data_equipment'
+
+    def __str__(self):
+        return '%s - %s' % (self.equipmentId, self.equipmentName)
+
+
+class DataEquipmentVariant(models.Model):
+    equipment = models.ForeignKey(DataEquipment, on_delete=models.CASCADE)
+    variant = models.CharField(max_length=32)
+    stamina = models.PositiveSmallIntegerField()
+    armour = models.PositiveSmallIntegerField()
+    strength = models.PositiveSmallIntegerField()
+    agility = models.PositiveSmallIntegerField()
+    intellect = models.PositiveSmallIntegerField()
+    haste = models.PositiveSmallIntegerField()
+    mastery = models.PositiveSmallIntegerField()
+    vers = models.PositiveSmallIntegerField()
+    crit = models.PositiveSmallIntegerField()
+    level = models.PositiveSmallIntegerField()
+    quality = models.CharField(max_length=20)
+
+    class Meta:
+        db_table = 'ft_data_equipmentvariant'
+        constraints = [
+            models.UniqueConstraint(fields=['equipment', 'variant'], name='unique_equipmentvariant')
+        ]
+
+
+#################################################################################
+#                                                                               #
+#                            Data/Profile Separator                             #
+#                                                                               #
+#################################################################################
+
+
+class ProfileFazzToolsUser(models.Model):
     userId = models.CharField(max_length=100, primary_key=True)
 
     class Meta:
-        db_table = 'ft_fazztoolsuser'
+        db_table = 'ft_profile_fazztoolsuser'
 
 
-class Alt(models.Model):
+class ProfileAlt(models.Model):
     altId = models.PositiveIntegerField(primary_key=True)
     altLevel = models.PositiveSmallIntegerField()
     altName = models.CharField(max_length=40)
@@ -68,10 +177,10 @@ class Alt(models.Model):
     altFaction = models.CharField(max_length=10)
     altExpiryDate = models.DateTimeField()
 
-    user = models.ForeignKey(FazzToolsUser, on_delete=models.CASCADE)
+    user = models.ForeignKey(ProfileFazzToolsUser, on_delete=models.CASCADE)
 
     class Meta:
-        db_table = 'ft_alt'
+        db_table = 'ft_profile_alt'
         constraints = [
             models.UniqueConstraint(fields=['altName', 'altRealmSlug'], name='unique_alt')
         ]
@@ -80,47 +189,8 @@ class Alt(models.Model):
         return '%s - %s' % (self.altName, self.altRealm)
 
 
-class Profession(models.Model):
-    professionId = models.PositiveIntegerField(primary_key=True)
-    professionName = models.CharField(max_length=30)
-
-    class Meta:
-        db_table = 'ft_profession'
-
-    def __str__(self):
-        return '%s - %s' % (self.professionId, self.professionName)
-
-
-class ProfessionTier(models.Model):
-    tierId = models.PositiveSmallIntegerField(primary_key=True)
-    tierName = models.CharField(max_length=50)
-
-    profession = models.ForeignKey(Profession, on_delete=models.CASCADE)
-
-    class Meta:
-        db_table = 'ft_professiontier'
-
-    def __str__(self):
-        return '%s - %s' % (self.tierId, self.tierName)
-
-
-class ProfessionRecipe(models.Model):
-    recipeId = models.PositiveSmallIntegerField(primary_key=True)
-    recipeName = models.CharField(max_length=50)
-    recipeRank = models.PositiveSmallIntegerField()
-    recipeCraftedQuantity = models.PositiveIntegerField()
-
-    professionTier = models.ForeignKey(ProfessionTier, on_delete=models.CASCADE)
-
-    class Meta:
-        db_table = 'ft_professionrecipe'
-
-    def __str__(self):
-        return '%s - %s' % (self.recipeId, self.recipeName)
-
-
-class AltProfession(models.Model):
-    alt = models.OneToOneField(Alt, on_delete=models.CASCADE, primary_key=True)
+class ProfileAltProfession(models.Model):
+    alt = models.OneToOneField(ProfileAlt, on_delete=models.CASCADE, primary_key=True)
 
     class Profession(models.IntegerChoices):
         MISSING = 0, _('Missing')
@@ -140,64 +210,28 @@ class AltProfession(models.Model):
     altProfessionExpiryDate = models.DateTimeField()
 
     class Meta:
-        db_table = 'ft_altprofession'
+        db_table = 'ft_profile_altprofession'
 
     def __str__(self):
         return '%s - %s' % (self.alt.altName, self.alt.altRealm)
 
 
-class AltProfessionData(models.Model):
-    alt = models.ForeignKey(AltProfession, on_delete=models.CASCADE)
-    professionRecipe = models.ForeignKey(ProfessionRecipe, on_delete=models.CASCADE)
-    professionTier = models.ForeignKey(ProfessionTier, on_delete=models.CASCADE)
-    profession = models.ForeignKey(Profession, on_delete=models.CASCADE)
+class ProfileAltProfessionData(models.Model):
+    alt = models.ForeignKey(ProfileAltProfession, on_delete=models.CASCADE)
+    professionRecipe = models.ForeignKey(DataProfessionRecipe, on_delete=models.CASCADE)
+    professionTier = models.ForeignKey(DataProfessionTier, on_delete=models.CASCADE)
+    profession = models.ForeignKey(DataProfession, on_delete=models.CASCADE)
     altProfessionDataExpiryDate = models.DateTimeField()
 
     class Meta:
-        db_table = 'ft_altprofessiondata'
+        db_table = 'ft_profile_altprofessiondata'
         constraints = [
             models.UniqueConstraint(fields=['alt', 'profession', 'professionTier', 'professionRecipe'], name='unique_altprofessiondata')
         ]
 
 
-class Equipment(models.Model):
-    equipmentId = models.PositiveIntegerField(primary_key=True)
-    equipmentName = models.CharField(max_length=80)
-    equipmentType = models.CharField(max_length=20)
-    equipmentSlot = models.CharField(max_length=20)
-    equipmentIcon = models.CharField(max_length=100)
-
-    class Meta:
-        db_table = 'ft_equipment'
-
-    def __str__(self):
-        return '%s - %s' % (self.equipmentId, self.equipmentName)
-
-
-class EquipmentVariant(models.Model):
-    equipment = models.ForeignKey(Equipment, on_delete=models.CASCADE)
-    variant = models.CharField(max_length=32)
-    stamina = models.PositiveSmallIntegerField()
-    armour = models.PositiveSmallIntegerField()
-    strength = models.PositiveSmallIntegerField()
-    agility = models.PositiveSmallIntegerField()
-    intellect = models.PositiveSmallIntegerField()
-    haste = models.PositiveSmallIntegerField()
-    mastery = models.PositiveSmallIntegerField()
-    vers = models.PositiveSmallIntegerField()
-    crit = models.PositiveSmallIntegerField()
-    level = models.PositiveSmallIntegerField()
-    quality = models.CharField(max_length=20)
-
-    class Meta:
-        db_table = 'ft_equipmentvariant'
-        constraints = [
-            models.UniqueConstraint(fields=['equipment', 'variant'], name='unique_equipmentvariant')
-        ]
-
-
-class AltEquipment(models.Model):
-    alt = models.OneToOneField(Alt, on_delete=models.CASCADE, primary_key=True)
+class ProfileAltEquipment(models.Model):
+    alt = models.OneToOneField(ProfileAlt, on_delete=models.CASCADE, primary_key=True)
     head = models.CharField(max_length=40)
     neck = models.CharField(max_length=40)
     shoulder = models.CharField(max_length=40)
@@ -219,7 +253,7 @@ class AltEquipment(models.Model):
     altEquipmentExpiryDate = models.DateTimeField()
 
     class Meta:
-        db_table = 'ft_altequipment'
+        db_table = 'ft_profile_altequipment'
 
     def __str__(self):
         return '%s - %s' % (self.alt.altName, self.alt.altRealm)
