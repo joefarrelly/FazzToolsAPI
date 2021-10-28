@@ -50,6 +50,7 @@ class DataReagent(models.Model):
     reagentId = models.PositiveIntegerField(primary_key=True)
     reagentName = models.CharField(max_length=100)
     reagentQuality = models.CharField(max_length=20)
+    reagentMedia = models.CharField(max_length=150)
 
     class Meta:
         db_table = 'ft_data_reagent'

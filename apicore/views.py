@@ -135,26 +135,49 @@ class ProfileAltProfessionDataView(viewsets.ModelViewSet):
     def list(self, request):
         if request.query_params.get('alt') is not None:
             tiers = {}
+            # recipes = {}
             alt = ProfileAlt.objects.filter(altName=request.query_params.get('alt'), altRealm=request.query_params.get('realm'))[:1]
             profession = DataProfession.objects.filter(professionName=request.query_params.get('profession'))[:1]
             queryset = ProfileAltProfessionData.objects.select_related('profession', 'professionTier', 'professionRecipe').all()
             queryset = queryset.filter(alt=alt[0].altId, profession=profession[0].professionId)
             for entry in queryset:
+                try:
+                    tiers[entry.professionTier.tierName]
+                except KeyError:
+                    tiers[entry.professionTier.tierName] = {}
+                try:
+                    tiers[entry.professionTier.tierName][entry.professionRecipe.recipeCategory]
+                except KeyError:
+                    tiers[entry.professionTier.tierName][entry.professionRecipe.recipeCategory] = []
                 # print(entry.professionRecipe)
                 recipe_reagent = DataRecipeReagent.objects.select_related('reagent').filter(recipe=entry.professionRecipe)
                 # print(recipe_reagent)
+                # recipes = {}
                 mats = []
                 for reagent in recipe_reagent:
-                    mats.append([reagent.reagent.reagentName, reagent.quantity])
+                    mats.append([reagent.reagent.reagentName, reagent.quantity, reagent.reagent.reagentMedia, reagent.reagent.reagentQuality])
                 recipe_list = [entry.professionRecipe.recipeName, entry.professionRecipe.recipeRank, entry.professionRecipe.recipeCraftedQuantity]
                 recipe_list.extend(mats)
-                try:
-                    tiers[entry.professionTier.tierName].append(recipe_list)
-                except KeyError:
-                    tiers[entry.professionTier.tierName] = [recipe_list]
+                tiers[entry.professionTier.tierName][entry.professionRecipe.recipeCategory].append(recipe_list)
+                # try:
+                #     recipes[entry.professionRecipe.recipeCategory].append(recipe_list)
+                # except KeyError:
+                #     recipes[entry.professionRecipe.recipeCategory] = [recipe_list]
+                # temp_recipes = list(map(list, recipes.items()))
+                # try:
+                #     tiers[entry.professionTier.tierName].append(temp_recipes)
+                # except KeyError:
+                #     tiers[entry.professionTier.tierName] = [temp_recipes]
             queryset = list(map(list, tiers.items()))
-            for key, value in queryset:
-                value = value.sort()
+            for item in queryset:
+                # print(item[1])
+                # print('#######')
+                item[1] = list(map(list, item[1].items()))
+            # queryset = list(tiers[entry.professionTier.tierName].items())
+            # queryset = [x for x in tiers.items()]
+            # for key, value in queryset:
+            #     value = value.sort()
+            # print(queryset[-1][0])
             if 'Shadowlands' in queryset[-1][0]:
                 queryset.insert(0, queryset.pop())
         else:
@@ -621,10 +644,19 @@ class DataScan(viewsets.ViewSet):
                                                                                     try:
                                                                                         obj_reagent = DataReagent.objects.get(reagentId=reagent_details['id'])
                                                                                     except DataReagent.DoesNotExist:
+                                                                                        reagent_media_response = limit_call(reagent_details['media']['key']['href'], params=dataobj)
+                                                                                        if reagent_media_response.status_code == 200:
+                                                                                            try:
+                                                                                                media = reagent_media_response.json()['assets'][0]['value']
+                                                                                            except KeyError as e:
+                                                                                                media = 'Not Found'
+                                                                                        else:
+                                                                                            print(reagent_media_response.status_code)
                                                                                         obj_reagent = DataReagent.objects.create(
                                                                                             reagentId=reagent_details['id'],
                                                                                             reagentName=reagent_details['name'],
-                                                                                            reagentQuality=reagent_details['quality']['name']
+                                                                                            reagentQuality=reagent_details['quality']['name'],
+                                                                                            reagentMedia=media
                                                                                         )
                                                                                 except KeyError as e:
                                                                                     print(e)
