@@ -107,6 +107,18 @@ class DataEquipmentVariant(models.Model):
         ]
 
 
+class DataMount(models.Model):
+    mountId = models.PositiveIntegerField(primary_key=True)
+    mountName = models.CharField(max_length=100)
+    mountDescription = models.CharField(max_length=500)
+    mountSource = models.CharField(max_length=50)
+    mountMedia = models.CharField(max_length=150)
+    mountFaction = models.CharField(max_length=30)
+
+    class Meta:
+        db_table = 'ft_data_mount'
+
+
 #################################################################################
 #                                                                               #
 #                            Data/Profile Separator                             #

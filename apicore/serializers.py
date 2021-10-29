@@ -45,6 +45,12 @@ class DataEquipmentVariantSerializer(serializers.HyperlinkedModelSerializer):
         fields = ('equipment', 'variant', 'stamina', 'armour', 'strength', 'agility', 'intellect', 'haste', 'mastery', 'vers', 'crit', 'level', 'quality')
 
 
+class DataMountSerializer(serializers.HyperlinkedModelSerializer):
+    class Meta:
+        model = DataMount
+        fields = ('mountId', 'mountName', 'mountDescription', 'mountSource', 'mountMedia', 'mountFaction')
+
+
 #################################################################################
 #                                                                               #
 #                            Data/Profile Separator                             #

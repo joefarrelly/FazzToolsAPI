@@ -62,6 +62,11 @@ class DataEquipmentVariantView(viewsets.ModelViewSet):
     queryset = DataEquipmentVariant.objects.all()
 
 
+class DataMountView(viewsets.ModelViewSet):
+    serializer_class = DataMountSerializer
+    queryset = DataMount.objects.all()
+
+
 #################################################################################
 #                                                                               #
 #                            Data/Profile Separator                             #
@@ -551,141 +556,191 @@ class DataScan(viewsets.ViewSet):
             try:
                 token = x.json()['access_token']
                 urls = [
-                    'https://eu.api.blizzard.com/data/wow/profession/index',
+                    'https://eu.api.blizzard.com/data/wow/profession/indexddd',
+                    'https://eu.api.blizzard.com/data/wow/mount/index',
                 ]
                 dataobj = {'access_token': token, 'namespace': 'static-eu', 'locale': 'en_US'}
                 for url in urls:
                     y = limit_call(url, params=dataobj)
                     if y.status_code == 200:
-                        try:
-                            profession_index = y.json()['professions']
-                            for profession in profession_index:
-                                # if profession['name'] != 'Mining':
-                                #     continue
-                                profession_response = limit_call(profession['key']['href'], params=dataobj)
-                                if profession_response.status_code == 200:
-                                    try:
-                                        profession_details = profession_response.json()
+                        if 'profession' in url:
+                            try:
+                                profession_index = y.json()['professions']
+                                for profession in profession_index:
+                                    # if profession['name'] != 'Mining':
+                                    #     continue
+                                    profession_response = limit_call(profession['key']['href'], params=dataobj)
+                                    if profession_response.status_code == 200:
                                         try:
-                                            obj_profession = DataProfession.objects.get(professionId=profession_details['id'])
-                                        except DataProfession.DoesNotExist:
-                                            obj_profession = DataProfession.objects.create(
-                                                professionId=profession_details['id'],
-                                                professionName=profession_details['name'],
-                                                professionDescription=profession_details['description']
-                                            )
-                                    except KeyError as e:
-                                        print(e)
-                                    try:
-                                        tier_index = profession_details['skill_tiers']
-                                        for tier in tier_index:
-                                            print('Processing tier: {}'.format(tier['name']))
-                                            tier_response = limit_call(tier['key']['href'], params=dataobj)
-                                            if tier_response.status_code == 200:
-                                                try:
-                                                    tier_details = tier_response.json()
+                                            profession_details = profession_response.json()
+                                            try:
+                                                obj_profession = DataProfession.objects.get(professionId=profession_details['id'])
+                                            except DataProfession.DoesNotExist:
+                                                obj_profession = DataProfession.objects.create(
+                                                    professionId=profession_details['id'],
+                                                    professionName=profession_details['name'],
+                                                    professionDescription=profession_details['description']
+                                                )
+                                        except KeyError as e:
+                                            print(e)
+                                        try:
+                                            tier_index = profession_details['skill_tiers']
+                                            for tier in tier_index:
+                                                print('Processing tier: {}'.format(tier['name']))
+                                                tier_response = limit_call(tier['key']['href'], params=dataobj)
+                                                if tier_response.status_code == 200:
                                                     try:
-                                                        obj_tier = DataProfessionTier.objects.get(tierId=tier_details['id'])
-                                                    except DataProfessionTier.DoesNotExist:
-                                                        obj_tier = DataProfessionTier.objects.create(
-                                                            profession=obj_profession,
-                                                            tierId=tier_details['id'],
-                                                            tierName=tier_details['name'],
-                                                            tierMinSkill=tier_details['minimum_skill_level'],
-                                                            tierMaxSkill=tier_details['maximum_skill_level']
-                                                        )
-                                                except KeyError as e:
-                                                    print(e)
-                                                try:
-                                                    category_index = tier_details['categories']
-                                                    for category in category_index:
-                                                        print('Processing category: {}'.format(category['name']))
+                                                        tier_details = tier_response.json()
                                                         try:
-                                                            recipe_index = category['recipes']
-                                                            for recipe in recipe_index:
-                                                                print('Processing recipe: {}'.format(recipe['name']))
-                                                                recipe_response = limit_call(recipe['key']['href'], params=dataobj)
-                                                                if recipe_response.status_code == 200:
-                                                                    try:
-                                                                        recipe_details = recipe_response.json()
+                                                            obj_tier = DataProfessionTier.objects.get(tierId=tier_details['id'])
+                                                        except DataProfessionTier.DoesNotExist:
+                                                            obj_tier = DataProfessionTier.objects.create(
+                                                                profession=obj_profession,
+                                                                tierId=tier_details['id'],
+                                                                tierName=tier_details['name'],
+                                                                tierMinSkill=tier_details['minimum_skill_level'],
+                                                                tierMaxSkill=tier_details['maximum_skill_level']
+                                                            )
+                                                    except KeyError as e:
+                                                        print(e)
+                                                    try:
+                                                        category_index = tier_details['categories']
+                                                        for category in category_index:
+                                                            print('Processing category: {}'.format(category['name']))
+                                                            try:
+                                                                recipe_index = category['recipes']
+                                                                for recipe in recipe_index:
+                                                                    print('Processing recipe: {}'.format(recipe['name']))
+                                                                    recipe_response = limit_call(recipe['key']['href'], params=dataobj)
+                                                                    if recipe_response.status_code == 200:
                                                                         try:
-                                                                            obj_recipe = DataProfessionRecipe.objects.get(recipeId=recipe_details['id'])
-                                                                        except DataProfessionRecipe.DoesNotExist:
+                                                                            recipe_details = recipe_response.json()
                                                                             try:
-                                                                                rank = recipe_details['rank']
-                                                                            except KeyError as e:
-                                                                                rank = 1
-                                                                            try:
-                                                                                crafted_quantity = recipe_details['crafted_quantity']['value']
-                                                                            except KeyError as e:
-                                                                                crafted_quantity = 1
-                                                                            try:
-                                                                                description = recipe_details['description']
-                                                                            except KeyError as e:
-                                                                                description = 'None'
-                                                                            obj_recipe = DataProfessionRecipe.objects.create(
-                                                                                tier=obj_tier,
-                                                                                recipeId=recipe_details['id'],
-                                                                                recipeName=recipe_details['name'],
-                                                                                recipeDescription=description,
-                                                                                recipeCategory=category['name'],
-                                                                                recipeRank=rank,
-                                                                                recipeCraftedQuantity=crafted_quantity
-                                                                            )
-                                                                    except KeyError as e:
-                                                                        print(e)
-                                                                    try:
-                                                                        reagent_index = recipe_details['reagents']
-                                                                        for reagent in reagent_index:
-                                                                            reagent_response = limit_call(reagent['reagent']['key']['href'], params=dataobj)
-                                                                            if reagent_response.status_code == 200:
+                                                                                obj_recipe = DataProfessionRecipe.objects.get(recipeId=recipe_details['id'])
+                                                                            except DataProfessionRecipe.DoesNotExist:
                                                                                 try:
-                                                                                    reagent_details = reagent_response.json()
-                                                                                    try:
-                                                                                        obj_reagent = DataReagent.objects.get(reagentId=reagent_details['id'])
-                                                                                    except DataReagent.DoesNotExist:
-                                                                                        reagent_media_response = limit_call(reagent_details['media']['key']['href'], params=dataobj)
-                                                                                        if reagent_media_response.status_code == 200:
-                                                                                            try:
-                                                                                                media = reagent_media_response.json()['assets'][0]['value']
-                                                                                            except KeyError as e:
-                                                                                                media = 'Not Found'
-                                                                                        else:
-                                                                                            print(reagent_media_response.status_code)
-                                                                                        obj_reagent = DataReagent.objects.create(
-                                                                                            reagentId=reagent_details['id'],
-                                                                                            reagentName=reagent_details['name'],
-                                                                                            reagentQuality=reagent_details['quality']['name'],
-                                                                                            reagentMedia=media
-                                                                                        )
+                                                                                    rank = recipe_details['rank']
                                                                                 except KeyError as e:
-                                                                                    print(e)
+                                                                                    rank = 1
                                                                                 try:
-                                                                                    obj_recipereagent = DataRecipeReagent.objects.get(recipe=obj_recipe, reagent=obj_reagent)
-                                                                                except DataRecipeReagent.DoesNotExist:
-                                                                                    obj_recipereagent = DataRecipeReagent.objects.create(
-                                                                                        recipe=obj_recipe,
-                                                                                        reagent=obj_reagent,
-                                                                                        quantity=reagent['quantity']
-                                                                                    )
-                                                                            else:
-                                                                                print(reagent_response.status_code)
-                                                                    except KeyError as e:
-                                                                        print(e)
-                                                                else:
-                                                                    print(recipe_response.status_code)
-                                                        except KeyError as e:
-                                                            print(e)
+                                                                                    crafted_quantity = recipe_details['crafted_quantity']['value']
+                                                                                except KeyError as e:
+                                                                                    crafted_quantity = 1
+                                                                                try:
+                                                                                    description = recipe_details['description']
+                                                                                except KeyError as e:
+                                                                                    description = 'None'
+                                                                                obj_recipe = DataProfessionRecipe.objects.create(
+                                                                                    tier=obj_tier,
+                                                                                    recipeId=recipe_details['id'],
+                                                                                    recipeName=recipe_details['name'],
+                                                                                    recipeDescription=description,
+                                                                                    recipeCategory=category['name'],
+                                                                                    recipeRank=rank,
+                                                                                    recipeCraftedQuantity=crafted_quantity
+                                                                                )
+                                                                        except KeyError as e:
+                                                                            print(e)
+                                                                        try:
+                                                                            reagent_index = recipe_details['reagents']
+                                                                            for reagent in reagent_index:
+                                                                                reagent_response = limit_call(reagent['reagent']['key']['href'], params=dataobj)
+                                                                                if reagent_response.status_code == 200:
+                                                                                    try:
+                                                                                        reagent_details = reagent_response.json()
+                                                                                        try:
+                                                                                            obj_reagent = DataReagent.objects.get(reagentId=reagent_details['id'])
+                                                                                        except DataReagent.DoesNotExist:
+                                                                                            reagent_media_response = limit_call(reagent_details['media']['key']['href'], params=dataobj)
+                                                                                            if reagent_media_response.status_code == 200:
+                                                                                                try:
+                                                                                                    media = reagent_media_response.json()['assets'][0]['value']
+                                                                                                except KeyError as e:
+                                                                                                    media = 'Not Found'
+                                                                                            else:
+                                                                                                print(reagent_media_response.status_code)
+                                                                                            obj_reagent = DataReagent.objects.create(
+                                                                                                reagentId=reagent_details['id'],
+                                                                                                reagentName=reagent_details['name'],
+                                                                                                reagentQuality=reagent_details['quality']['name'],
+                                                                                                reagentMedia=media
+                                                                                            )
+                                                                                    except KeyError as e:
+                                                                                        print(e)
+                                                                                    try:
+                                                                                        obj_recipereagent = DataRecipeReagent.objects.get(recipe=obj_recipe, reagent=obj_reagent)
+                                                                                    except DataRecipeReagent.DoesNotExist:
+                                                                                        obj_recipereagent = DataRecipeReagent.objects.create(
+                                                                                            recipe=obj_recipe,
+                                                                                            reagent=obj_reagent,
+                                                                                            quantity=reagent['quantity']
+                                                                                        )
+                                                                                else:
+                                                                                    print(reagent_response.status_code)
+                                                                        except KeyError as e:
+                                                                            print(e)
+                                                                    else:
+                                                                        print(recipe_response.status_code)
+                                                            except KeyError as e:
+                                                                print(e)
+                                                    except KeyError as e:
+                                                        print(e)
+                                                else:
+                                                    print(tier_response.status_code)
+                                        except KeyError as e:
+                                            print(e)
+                                    else:
+                                        print(profession_response.status_code)
+                            except KeyError as e:
+                                print(e)
+                        elif 'mount' in url:
+                            try:
+                                mount_index = y.json()['mounts']
+                                for mount in mount_index:
+                                    print(mount['name'])
+                                    mount_response = limit_call(mount['key']['href'], params=dataobj)
+                                    if mount_response.status_code == 200:
+                                        try:
+                                            mount_details = mount_response.json()
+                                            try:
+                                                obj_mount = DataMount.objects.get(mountId=mount_details['id'])
+                                            except DataMount.DoesNotExist:
+                                                mount_media_response = limit_call(mount_details['creature_displays'][0]['key']['href'], params=dataobj)
+                                                if mount_media_response.status_code == 200:
+                                                    try:
+                                                        media = mount_media_response.json()['assets'][0]['value']
+                                                    except KeyError as e:
+                                                        media = 'Not Found'
+                                                else:
+                                                    print(mount_media_response.status_code)
+                                                try:
+                                                    faction = mount_details['faction']['name']
                                                 except KeyError as e:
-                                                    print(e)
-                                            else:
-                                                print(tier_response.status_code)
-                                    except KeyError as e:
-                                        print(e)
-                                else:
-                                    print(profession_response.status_code)
-                        except KeyError as e:
-                            print(e)
+                                                    faction = 'N/A'
+                                                try:
+                                                    source = mount_details['source']['name']
+                                                except KeyError as e:
+                                                    source = 'N/A'
+                                                try:
+                                                    description = mount_details['description']
+                                                except KeyError as e:
+                                                    description = 'None'
+                                                if description is None:
+                                                    description = 'None'
+                                                obj_mount = DataMount.objects.create(
+                                                    mountId=mount_details['id'],
+                                                    mountName=mount_details['name'],
+                                                    mountDescription=description,
+                                                    mountSource=source,
+                                                    mountMedia=media,
+                                                    mountFaction=faction
+                                                )
+                                        except KeyError as e:
+                                            print(e)
+                                    else:
+                                        print(mount_response.status_code)
+                            except KeyError as e:
+                                print(e)
                     else:
                         print(y.status_code)
             except KeyError as e:

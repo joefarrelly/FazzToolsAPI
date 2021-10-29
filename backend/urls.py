@@ -33,6 +33,7 @@ data.register(r'reagents', views.DataReagentView)
 data.register(r'recipereagents', views.DataRecipeReagentView)
 data.register(r'equipments', views.DataEquipmentView)
 data.register(r'equipmentvariants', views.DataEquipmentVariantView)
+data.register(r'mounts', views.DataMountView)
 
 custom = routers.DefaultRouter()
 custom.register(r'bnetlogin', views.BnetLogin, 'bnetlogin')
