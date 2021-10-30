@@ -4,7 +4,7 @@ from .models import *
 
 # Register your models here.
 
-admin.site.register(ProfileFazzToolsUser)
+admin.site.register(ProfileUser)
 admin.site.register(ProfileAlt)
 admin.site.register(DataProfession)
 admin.site.register(DataProfessionTier)

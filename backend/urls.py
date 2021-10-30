@@ -19,7 +19,8 @@ from rest_framework import routers
 from apicore import views
 
 profile = routers.DefaultRouter()
-profile.register(r'users', views.ProfileFazzToolsUserView)
+profile.register(r'users', views.ProfileUserView)
+profile.register(r'usermounts', views.ProfileUserMountView)
 profile.register(r'alts', views.ProfileAltView)
 profile.register(r'altprofessions', views.ProfileAltProfessionView)
 profile.register(r'altprofessiondatas', views.ProfileAltProfessionDataView)

@@ -112,7 +112,8 @@ class DataMount(models.Model):
     mountName = models.CharField(max_length=100)
     mountDescription = models.CharField(max_length=500)
     mountSource = models.CharField(max_length=50)
-    mountMedia = models.CharField(max_length=150)
+    mountMediaZoom = models.CharField(max_length=150)
+    mountMediaIcon = models.CharField(max_length=150)
     mountFaction = models.CharField(max_length=30)
 
     class Meta:
@@ -126,11 +127,19 @@ class DataMount(models.Model):
 #################################################################################
 
 
-class ProfileFazzToolsUser(models.Model):
+class ProfileUser(models.Model):
     userId = models.CharField(max_length=100, primary_key=True)
 
     class Meta:
-        db_table = 'ft_profile_fazztoolsuser'
+        db_table = 'ft_profile_user'
+
+
+class ProfileUserMount(models.Model):
+    user = models.ForeignKey(ProfileUser, on_delete=models.CASCADE)
+    mount = models.ForeignKey(DataMount, on_delete=models.CASCADE)
+
+    class Meta:
+        db_table = 'ft_profile_usermount'
 
 
 class ProfileAlt(models.Model):
@@ -190,7 +199,7 @@ class ProfileAlt(models.Model):
     altFaction = models.CharField(max_length=10)
     altExpiryDate = models.DateTimeField()
 
-    user = models.ForeignKey(ProfileFazzToolsUser, on_delete=models.CASCADE)
+    user = models.ForeignKey(ProfileUser, on_delete=models.CASCADE)
 
     class Meta:
         db_table = 'ft_profile_alt'

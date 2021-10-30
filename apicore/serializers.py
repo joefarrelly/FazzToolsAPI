@@ -48,7 +48,7 @@ class DataEquipmentVariantSerializer(serializers.HyperlinkedModelSerializer):
 class DataMountSerializer(serializers.HyperlinkedModelSerializer):
     class Meta:
         model = DataMount
-        fields = ('mountId', 'mountName', 'mountDescription', 'mountSource', 'mountMedia', 'mountFaction')
+        fields = ('mountId', 'mountName', 'mountDescription', 'mountSource', 'mountMediaZoom', 'mountMediaIcon', 'mountFaction')
 
 
 #################################################################################
@@ -58,10 +58,16 @@ class DataMountSerializer(serializers.HyperlinkedModelSerializer):
 #################################################################################
 
 
-class ProfileFazzToolsUserSerializer(serializers.HyperlinkedModelSerializer):
+class ProfileUserSerializer(serializers.HyperlinkedModelSerializer):
     class Meta:
-        model = ProfileFazzToolsUser
+        model = ProfileUser
         fields = ('userId',)
+
+
+class ProfileUserMountSerializer(serializers.HyperlinkedModelSerializer):
+    class Meta:
+        model = ProfileUserMount
+        fields = ('user', 'mount')
 
 
 class ProfileAltSerializer(serializers.HyperlinkedModelSerializer):
