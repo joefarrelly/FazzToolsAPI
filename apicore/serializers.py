@@ -1,6 +1,6 @@
 from rest_framework import serializers
 # from .models import FazzToolsUser, Alt, Profession, ProfessionTier, ProfessionRecipe, AltProfession, AltProfessionData, Equipment, EquipmentVariant, AltEquipment
-from .models import *
+from apicore.models import *
 
 
 class DataProfessionSerializer(serializers.HyperlinkedModelSerializer):
