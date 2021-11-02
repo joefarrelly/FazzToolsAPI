@@ -4,6 +4,8 @@ from apicore.models import *
 from types import SimpleNamespace
 from requests.adapters import HTTPAdapter
 from requests.packages.urllib3.util.retry import Retry
+from django.utils import timezone
+import datetime
 
 item_search_details = [
     [6, 'ability_mount_ridinghorse'],
@@ -957,7 +959,7 @@ def limit_call(url, params):
     try:
         response = p.get(url, params=params, timeout=5)
         return response
-    except requests.exceptions.RequestsException as e:
+    except requests.exceptions.RequestException as e:
         temp_response = {'status_code': 999}
         response = SimpleNamespace(**temp_response)
         return response
@@ -966,6 +968,263 @@ def limit_call(url, params):
 @shared_task
 def add(x, y):
     return x + y
+
+
+@shared_task
+def fullAltScan(user, client, secret):
+    counter = 0
+    alts = []
+    all_alts = ProfileAlt.objects.all()
+    old_alts = all_alts.filter(user=user)
+    for alt in old_alts:
+        alts.append(alt.altId)
+    total = len(alts)
+    user_obj = ProfileUser.objects.get(userId=user)
+    for index, alt in enumerate(alts, start=1):
+        print(counter)
+        print('Processing: {} of {}'.format(index, total))
+        alt_obj = ProfileAlt.objects.get(altId=alt)
+        # if alt_obj.altName != 'Fazziest':
+        #     continue
+        realm = alt_obj.altRealmSlug
+        name = alt_obj.altName.lower()
+        url = 'https://eu.battle.net/oauth/token?grant_type=client_credentials'
+        params = {'client_id': client, 'client_secret': secret}
+        x = requests.post(url, data=params)
+        counter += 1
+        try:
+            token = x.json()['access_token']
+            urls = [
+                'https://eu.api.blizzard.com/profile/wow/character/' + realm + '/' + name + '/professions',
+                'https://eu.api.blizzard.com/profile/wow/character/' + realm + '/' + name + '/equipment',
+                'https://eu.api.blizzard.com/profile/wow/character/' + realm + '/' + name + '/collections/mounts',
+            ]
+            myobj = {'access_token': token, 'namespace': 'profile-eu', 'locale': 'en_US'}
+            dataobj = {'access_token': token, 'locale': 'en_US'}
+            for url in urls:
+                y = p.get(url, params=myobj, timeout=5)
+                counter += 1
+                if y.status_code == 200:
+                    if 'professions' in url:
+                        print('profession pending')
+                        alt_profs = []
+                        try:
+                            prof_obj = ProfileAltProfession.objects.get(alt=alt_obj)
+                        except ProfileAltProfession.DoesNotExist:
+                            prof_obj = ProfileAltProfession.objects.create(
+                                alt=alt_obj,
+                                profession1=0,
+                                profession2=0,
+                                altProfessionExpiryDate=timezone.now() + datetime.timedelta(days=30)
+                            )
+                        try:
+                            data = y.json()['primaries']
+                            for prof in data:
+                                alt_profs.append(prof['profession']['id'])
+                                try:
+                                    obj = DataProfession.objects.get(professionId=prof['profession']['id'])
+                                except DataProfession.DoesNotExist:
+                                    print('Does not exist: {}'.format(prof['profession']['name']))
+                                for tier in prof['tiers']:
+                                    try:
+                                        obj1 = DataProfessionTier.objects.get(tierId=tier['tier']['id'])
+                                    except DataProfessionTier.DoesNotExist:
+                                        print('Does not exist: {}'.format(tier['tier']['name']))
+                                    try:
+                                        for recipe in tier['known_recipes']:
+                                            try:
+                                                obj2 = DataProfessionRecipe.objects.get(recipeId=recipe['id'])
+                                            except DataProfessionRecipe.DoesNotExist:
+                                                print('Does not exist: {}'.format(recipe['name']))
+
+                                                recipe_response = limit_call(recipe['key']['href'], params=dataobj)
+                                                counter += 1
+                                                if recipe_response.status_code == 200:
+                                                    try:
+                                                        recipe_details = recipe_response.json()
+                                                        try:
+                                                            rank = recipe_details['rank']
+                                                        except KeyError as e:
+                                                            rank = 1
+                                                        try:
+                                                            crafted_quantity = recipe_details['crafted_quantity']['value']
+                                                        except KeyError as e:
+                                                            crafted_quantity = 1
+                                                        try:
+                                                            description = recipe_details['description']
+                                                        except KeyError as e:
+                                                            description = 'None'
+                                                        obj2 = DataProfessionRecipe.objects.create(
+                                                            tier=obj1,
+                                                            recipeId=recipe_details['id'],
+                                                            recipeName=recipe_details['name'],
+                                                            recipeDescription=description,
+                                                            recipeCategory='N/A',
+                                                            recipeRank=rank,
+                                                            recipeCraftedQuantity=crafted_quantity
+                                                        )
+                                                    except KeyError as e:
+                                                        pass
+                                            try:
+                                                obj3 = ProfileAltProfessionData.objects.get(alt=prof_obj, profession=obj, professionTier=obj1, professionRecipe=obj2)
+                                                obj3.altProfessionDataExpiryDate = timezone.now() + datetime.timedelta(days=30)
+                                                obj3.save()
+                                            except ProfileAltProfessionData.DoesNotExist:
+                                                obj3 = ProfileAltProfessionData.objects.create(
+                                                    alt=prof_obj,
+                                                    profession=obj,
+                                                    professionTier=obj1,
+                                                    professionRecipe=obj2,
+                                                    altProfessionDataExpiryDate=timezone.now() + datetime.timedelta(days=30)
+                                                )
+                                    except KeyError as e:
+                                        pass
+                        except KeyError as e:
+                            pass
+                        while len(alt_profs) < 2:
+                            alt_profs.append(0)
+                        old_alt_profs = [prof_obj.profession1, prof_obj.profession2]
+                        for prof in old_alt_profs:
+                            if prof not in alt_profs:
+                                ProfileAltProfessionData.objects.filter(alt=prof_obj, profession=prof).delete()
+                        prof_obj.profession1 = alt_profs[0]
+                        prof_obj.profession2 = alt_profs[1]
+                        prof_obj.altProfessionExpiryDate = timezone.now() + datetime.timedelta(days=30)
+                        prof_obj.save()
+                    elif 'equipment' in url:
+                        print('equipment pending')
+                        alt_equipment = {}
+                        try:
+                            alt_equip_obj = ProfileAltEquipment.objects.get(alt=alt_obj)
+                        except ProfileAltEquipment.DoesNotExist:
+                            alt_equip_obj = ProfileAltEquipment.objects.create(
+                                alt=alt_obj,
+                                head=0,
+                                neck=0,
+                                shoulder=0,
+                                back=0,
+                                chest=0,
+                                tabard=0,
+                                shirt=0,
+                                wrist=0,
+                                hands=0,
+                                belt=0,
+                                legs=0,
+                                feet=0,
+                                ring1=0,
+                                ring2=0,
+                                trinket1=0,
+                                trinket2=0,
+                                weapon1=0,
+                                weapon2=0,
+                                altEquipmentExpiryDate=timezone.now() + datetime.timedelta(days=30)
+                            )
+                        try:
+                            data = y.json()['equipped_items']
+                            for item in data:
+                                try:
+                                    obj = DataEquipment.objects.get(equipmentId=item['item']['id'])
+                                except DataEquipment.DoesNotExist:
+                                    obj = DataEquipment.objects.create(
+                                        equipmentId=item['item']['id'],
+                                        equipmentName=item['name'],
+                                        equipmentType=item['item_subclass']['name'],
+                                        equipmentSlot=item['slot']['name'],
+                                        equipmentIcon='not done yet'
+                                    )
+                                variantCode = ''
+                                try:
+                                    for bonus in item['bonus_list']:
+                                        variantCode += str(bonus)
+                                except KeyError:
+                                    variantCode = 'FLUFF'
+                                try:
+                                    obj1 = DataEquipmentVariant.objects.get(equipment=obj, variant=variantCode)
+                                except DataEquipmentVariant.DoesNotExist:
+                                    stamina = strength = agility = intellect = haste = mastery = vers = crit = 0
+                                    try:
+                                        for stat in item['stats']:
+                                            if stat['type']['type'] == 'STAMINA':
+                                                stamina = stat['value']
+                                            elif stat['type']['type'] == 'STRENGTH':
+                                                strength = stat['value']
+                                            elif stat['type']['type'] == 'AGILITY':
+                                                agility = stat['value']
+                                            elif stat['type']['type'] == 'INTELLECT':
+                                                intellect = stat['value']
+                                            elif stat['type']['type'] == 'HASTE_RATING':
+                                                haste = stat['value']
+                                            elif stat['type']['type'] == 'MASTERY_RATING':
+                                                mastery = stat['value']
+                                            elif stat['type']['type'] == 'VERSATILITY':
+                                                vers = stat['value']
+                                            elif stat['type']['type'] == 'CRIT_RATING':
+                                                crit = stat['value']
+                                    except KeyError:
+                                        pass
+                                    try:
+                                        armour = item['armor']['value']
+                                    except KeyError:
+                                        armour = 0
+                                    obj1 = DataEquipmentVariant.objects.create(
+                                        equipment=obj,
+                                        variant=variantCode,
+                                        stamina=stamina,
+                                        armour=armour,
+                                        strength=strength,
+                                        agility=agility,
+                                        intellect=intellect,
+                                        haste=haste,
+                                        mastery=mastery,
+                                        vers=vers,
+                                        crit=crit,
+                                        level=item['level']['value'],
+                                        quality=item['quality']['name']
+                                    )
+                                alt_equipment[item['slot']['name'].lower()] = str(item['item']['id']) + ':' + variantCode
+                        except KeyError as e:
+                            print(e)
+                        setattr(alt_equip_obj, 'head', alt_equipment.get('head') or 0)
+                        setattr(alt_equip_obj, 'neck', alt_equipment.get('neck') or 0)
+                        setattr(alt_equip_obj, 'shoulder', alt_equipment.get('shoulders') or 0)
+                        setattr(alt_equip_obj, 'back', alt_equipment.get('back') or 0)
+                        setattr(alt_equip_obj, 'chest', alt_equipment.get('chest') or 0)
+                        setattr(alt_equip_obj, 'tabard', alt_equipment.get('tabard') or 0)
+                        setattr(alt_equip_obj, 'shirt', alt_equipment.get('shirt') or 0)
+                        setattr(alt_equip_obj, 'wrist', alt_equipment.get('wrist') or 0)
+                        setattr(alt_equip_obj, 'hands', alt_equipment.get('hands') or 0)
+                        setattr(alt_equip_obj, 'belt', alt_equipment.get('waist') or 0)
+                        setattr(alt_equip_obj, 'legs', alt_equipment.get('legs') or 0)
+                        setattr(alt_equip_obj, 'feet', alt_equipment.get('feet') or 0)
+                        setattr(alt_equip_obj, 'ring1', alt_equipment.get('ring 1') or 0)
+                        setattr(alt_equip_obj, 'ring2', alt_equipment.get('ring 2') or 0)
+                        setattr(alt_equip_obj, 'trinket1', alt_equipment.get('trinket 1') or 0)
+                        setattr(alt_equip_obj, 'trinket2', alt_equipment.get('trinket 2') or 0)
+                        setattr(alt_equip_obj, 'weapon1', alt_equipment.get('main hand') or 0)
+                        setattr(alt_equip_obj, 'weapon2', alt_equipment.get('off hand') or 0)
+                        alt_equip_obj.save()
+                    elif 'mounts' in url:
+                        print('mounts pending')
+                        try:
+                            data = y.json()['mounts']
+                            for mount in data:
+                                try:
+                                    mount_obj = DataMount.objects.get(mountId=mount['mount']['id'])
+                                except DataMount.DoesNotExist:
+                                    print('Mount does not exist: {} - {}'.format(mount['mount']['id'], mount['mount']['name']))
+                                try:
+                                    obj = ProfileUserMount.objects.get(user=user_obj, mount=mount_obj)
+                                except ProfileUserMount.DoesNotExist:
+                                    obj = ProfileUserMount.objects.create(
+                                        user=user_obj,
+                                        mount=mount_obj
+                                    )
+                        except KeyError as e:
+                            print(e)
+                    else:
+                        print('donebutnotdone')
+        except Exception as e:
+            print(e)
 
 
 @shared_task
