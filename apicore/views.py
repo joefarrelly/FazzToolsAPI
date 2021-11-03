@@ -259,7 +259,7 @@ class BnetLogin(viewsets.ViewSet):
     def create(self, request):
         if request.data.get('state') == 'blizzardeumz76c':
             url = 'https://eu.battle.net/oauth/token?grant_type=authorization_code'
-            params = {'client_id': request.data.get('client_id'), 'client_secret': BLIZZ_SECRET, 'code': request.data.get('code'), 'redirect_uri': env("REDIRECT_URL")}
+            params = {'client_id': request.data.get('client_id'), 'client_secret': BLIZZ_SECRET, 'code': request.data.get('code'), 'redirect_uri': env("BLIZZ_REDIRECT_URL")}
             x = requests.post(url, data=params)
             try:
                 token = x.json()['access_token']

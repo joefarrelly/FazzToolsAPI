@@ -42,7 +42,7 @@ custom.register(r'scanalt', views.ScanAlt, 'scanalt')
 custom.register(r'datascan', views.DataScan, 'datascan')
 
 urlpatterns = [
-    path('/api/admin/', admin.site.urls),
+    path('api/admin/', admin.site.urls),
     path('api/profile/', include(profile.urls)),
     path('api/data/', include(data.urls)),
     path('api/custom/', include(custom.urls)),

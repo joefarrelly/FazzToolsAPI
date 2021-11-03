@@ -31,7 +31,7 @@ SECRET_KEY = env("SECRET_KEY")
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = env("DEBUG_OPTION")
 
-ALLOWED_HOSTS = ['127.0.0.1:8000', 'localhost', 'fazztoolsapi.ddns.net']
+ALLOWED_HOSTS = ['127.0.0.1', 'fazztoolsapi.ddns.net']
 
 
 # Application definition
@@ -144,7 +144,6 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 CORS_ALLOWED_ORIGINS = [
     'http://localhost:3000',
-    'http://localhost:8080',
     'https://fazztools.hopto.org'
 ]
 
