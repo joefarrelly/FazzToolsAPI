@@ -73,7 +73,7 @@ class ProfileUserMountSerializer(serializers.HyperlinkedModelSerializer):
 class ProfileAltSerializer(serializers.HyperlinkedModelSerializer):
     class Meta:
         model = ProfileAlt
-        fields = ('altId', 'altLevel', 'altName', 'altRealm', 'altRealmId', 'altRealmSlug', 'altClass', 'get_altClass_display', 'altRace', 'get_altRace_display', 'altGender', 'altFaction')
+        fields = ('altId', 'altAccountId', 'altLevel', 'altName', 'altRealm', 'altRealmId', 'altRealmSlug', 'altClass', 'get_altClass_display', 'altRace', 'get_altRace_display', 'altGender', 'altFaction')
 
 
 class ProfileAltProfessionSerializer(serializers.ModelSerializer):

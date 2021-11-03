@@ -115,7 +115,7 @@ class ProfileAltView(viewsets.ModelViewSet):
         else:
             queryset = queryset.filter(user=user).order_by('-altLevel')
         if not fields or fields[0] == '':
-            fields = ['altId', 'altLevel', 'altName', 'altRealm', 'altRealmId', 'altRealmSlug', 'altClass', 'get_altClass_display', 'altRace', 'get_altRace_display', 'altGender', 'altFaction']
+            fields = ['altId', 'altAccountId', 'altLevel', 'altName', 'altRealm', 'altRealmId', 'altRealmSlug', 'altClass', 'get_altClass_display', 'altRace', 'get_altRace_display', 'altGender', 'altFaction']
         alts = []
         for alt in queryset:
             temp = []
@@ -259,9 +259,7 @@ class BnetLogin(viewsets.ViewSet):
     def create(self, request):
         if request.data.get('state') == 'blizzardeumz76c':
             url = 'https://eu.battle.net/oauth/token?grant_type=authorization_code'
-            params = {'client_id': request.data.get('client_id'), 'client_secret': BLIZZ_SECRET, 'code': request.data.get('code'), 'redirect_uri': 'https://fazztools.hopto.org/redirect/'}
-            # http://localhost:3000/redirect/
-            # https://fazztools.hopto.org/redirect/
+            params = {'client_id': request.data.get('client_id'), 'client_secret': BLIZZ_SECRET, 'code': request.data.get('code'), 'redirect_uri': env("REDIRECT_URL")}
             x = requests.post(url, data=params)
             try:
                 token = x.json()['access_token']
@@ -281,10 +279,12 @@ class BnetLogin(viewsets.ViewSet):
                     test1 = y.json()['wow_accounts']
                     for key1 in test1:
                         test = key1['characters']
+                        account = key1['id']
                         for key in test:
                             altId.append(key['id'])
                             try:
                                 obj = ProfileAlt.objects.get(altId=key['id'])
+                                obj.altAccountId = account
                                 obj.altLevel = key['level']
                                 obj.altName = key['name']
                                 obj.altRealm = key['realm']['name']
@@ -300,6 +300,7 @@ class BnetLogin(viewsets.ViewSet):
                             except ProfileAlt.DoesNotExist:
                                 ProfileAlt.objects.create(
                                     altId=key['id'],
+                                    altAccountId=account,
                                     altLevel=key['level'],
                                     altName=key['name'],
                                     altRealm=key['realm']['name'],

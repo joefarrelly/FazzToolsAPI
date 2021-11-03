@@ -144,6 +144,7 @@ class ProfileUserMount(models.Model):
 
 class ProfileAlt(models.Model):
     altId = models.PositiveIntegerField(primary_key=True)
+    altAccountId = models.PositiveIntegerField()
     altLevel = models.PositiveSmallIntegerField()
     altName = models.CharField(max_length=40)
     altRealm = models.CharField(max_length=40)
