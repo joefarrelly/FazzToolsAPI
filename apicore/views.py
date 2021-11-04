@@ -1,5 +1,6 @@
 from django.shortcuts import render, redirect
 from rest_framework import viewsets, views, response
+from rest_framework.parsers import MultiPartParser
 # from .serializers import FazzToolsUserSerializer, AltSerializer, ProfessionSerializer, ProfessionTierSerializer, ProfessionRecipeSerializer, AltProfessionSerializer, AltProfessionDataSerializer, EquipmentSerializer, EquipmentVariantSerializer, AltEquipmentSerializer
 from apicore.serializers import *
 # from .models import FazzToolsUser, Alt, Profession, ProfessionTier, ProfessionRecipe, AltProfession, AltProfessionData, Equipment, EquipmentVariant, AltEquipment
@@ -18,6 +19,8 @@ from requests.packages.urllib3.util.retry import Retry
 from apicore.tasks import fullDataScan, fullAltScan
 
 import environ
+
+import os
 
 env = environ.Env()
 environ.Env.read_env()
@@ -79,6 +82,17 @@ class DataMountView(viewsets.ModelViewSet):
 class ProfileUserView(viewsets.ModelViewSet):
     serializer_class = ProfileUserSerializer
     queryset = ProfileUser.objects.all()
+
+    def perform_update(self, serializer):
+        user = serializer.validated_data.get('userId')
+        file = serializer.validated_data.get('userFile')
+
+        obj_user = ProfileUser.objects.get(userId=user)
+        try:
+            os.remove(os.getcwd() + aFile.userFile.url)
+        except Exception as e:
+            print(e)
+        serializer.save(userId=user, file=file)
 
 
 class ProfileUserMountView(viewsets.ModelViewSet):
@@ -164,8 +178,8 @@ class ProfileAltProfessionDataView(viewsets.ModelViewSet):
         if request.query_params.get('alt') is not None:
             tiers = {}
             # recipes = {}
-            alt = ProfileAlt.objects.filter(altName=request.query_params.get('alt'), altRealm=request.query_params.get('realm'))[:1]
-            profession = DataProfession.objects.filter(professionName=request.query_params.get('profession'))[:1]
+            alt = ProfileAlt.objects.filter(altName=request.query_params.get('alt').title(), altRealmSlug=request.query_params.get('realm'))[:1]
+            profession = DataProfession.objects.filter(professionName=request.query_params.get('profession').title())[:1]
             queryset = ProfileAltProfessionData.objects.select_related('profession', 'professionTier', 'professionRecipe').all()
             queryset = queryset.filter(alt=alt[0].altId, profession=profession[0].professionId)
             for entry in queryset:
@@ -273,7 +287,8 @@ class BnetLogin(viewsets.ViewSet):
                         user_obj = ProfileUser.objects.get(userId=result)
                     except ProfileUser.DoesNotExist:
                         user_obj = ProfileUser.objects.create(
-                            userId=result
+                            userId=result,
+                            userFile=''
                         )
                     altId = []
                     test1 = y.json()['wow_accounts']
@@ -350,3 +365,16 @@ class DataScan(viewsets.ViewSet):
             return response.Response('Passowrd Correct')
         else:
             return response.Response('Incorrect Password')
+
+
+##########################################################################################
+class FileUpload(viewsets.ViewSet):
+    def create(self, request):
+        print(request.data.get('file'))
+        user_file = request.data.get('file')
+        file_name = str(user_file)
+        with open("media/uploads/{}".format(file_name), 'wb+') as f:
+            for chunk in user_file.chunks():
+                f.write(chunk)
+        return response.Response('yes')
+##########################################################################################
