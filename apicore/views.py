@@ -89,7 +89,7 @@ class ProfileUserView(viewsets.ModelViewSet):
 
         obj_user = ProfileUser.objects.get(userId=user)
         try:
-            os.remove(os.getcwd() + aFile.userFile.url)
+            os.remove(os.getcwd() + obj_user.userFile.url)
         except Exception as e:
             print(e)
         serializer.save(userId=user, file=file)
