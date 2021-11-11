@@ -41,7 +41,7 @@ custom = routers.DefaultRouter()
 custom.register(r'bnetlogin', views.BnetLogin, 'bnetlogin')
 custom.register(r'scanalt', views.ScanAlt, 'scanalt')
 custom.register(r'datascan', views.DataScan, 'datascan')
-custom.register(r'fileupload', views.FileUpload, 'fileupload')
+# custom.register(r'fileupload', views.FileUpload, 'fileupload')
 
 urlpatterns = [
     path('api/admin/', admin.site.urls),

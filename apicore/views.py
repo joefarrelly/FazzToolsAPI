@@ -22,6 +22,8 @@ import environ
 
 import os
 
+import ast
+
 env = environ.Env()
 environ.Env.read_env()
 
@@ -94,6 +96,44 @@ class ProfileUserView(viewsets.ModelViewSet):
             print(e)
         serializer.save(userId=user, file=file)
 
+    def list(self, request):
+        user = request.query_params.get('user')
+        queryset = ProfileUser.objects.all()
+        if user is None:
+            queryset = {}
+        else:
+            queryset = queryset.filter(userId=user)
+        temp = queryset[0].userFile
+        temp2 = temp.file.open('r')
+        temp3 = temp2.read()
+        temp6 = (temp3.decode('utf-8'))
+        temp6 = temp6.replace('[', '')
+        temp6 = temp6.replace(']', '')
+        temp6 = temp6.replace('=', ':')
+        temp6 = temp6[17:]
+        temp6 = temp6.replace('\n', '')
+        temp6 = temp6.replace('\t', '')
+        temp6 = temp6.replace('{}', 'None')
+        temp7 = ast.literal_eval(temp6)
+        result = []
+        for item in temp7['alts']:
+            print(item)
+            specs = []
+            if temp7['alts'][item]['kb'] is not None:
+                for spec in temp7['alts'][item]['kb']:
+                    specs.append(spec)
+            else:
+                specs = ['---', '---', '---', '---']
+            specs.sort()
+            while len(specs) < 4:
+                specs.append('---')
+            temp8 = item.split('-')
+            test = ProfileAlt.objects.get(altName=temp8[0], altRealm=temp8[1])
+            temp8.append(test.get_altClass_display())
+            temp8.extend(specs)
+            result.append(temp8)
+        return response.Response(result)
+
 
 class ProfileUserMountView(viewsets.ModelViewSet):
     serializer_class = ProfileUserMountSerializer
@@ -155,12 +195,14 @@ class ProfileAltProfessionView(viewsets.ModelViewSet):
         else:
             queryset = ProfileAltProfession.objects.filter(alt__in=queryset).select_related('alt').order_by('-alt__altLevel')
         if not fields or fields[0] == '':
-            fields = ['.altName', '.altRealm', 'profession1', 'get_profession1_display', 'profession2', 'get_profession2_display']
+            fields = ['.altName', '.altRealm', '.get_altClass_display', 'profession1', 'get_profession1_display', 'profession2', 'get_profession2_display']
         alts = []
         for alt in queryset:
             temp = []
             for field in fields:
-                if '_' in field:
+                if '.' in field and '_' in field:
+                    temp.append(getattr(alt.alt, field[1:])())
+                elif '_' in field:
                     temp.append(getattr(alt, field)())
                 elif '.' in field:
                     temp.append(getattr(alt.alt, field[1:]))
@@ -241,14 +283,17 @@ class ProfileAltEquipmentView(viewsets.ModelViewSet):
         else:
             queryset = ProfileAltEquipment.objects.filter(alt__in=queryset).select_related('alt').order_by('-alt__altLevel')
         if not fields or fields[0] == '':
-            fields = ['.altName', '.altRealm', 'head', 'neck', 'shoulder', 'back', 'chest', 'tabard', 'shirt', 'wrist', 'hands', 'belt', 'legs', 'feet', 'ring1', 'ring2', 'trinket1', 'trinket2', 'weapon1', 'weapon2']
+            fields = ['.altName', '.altRealm', '.get_altClass_display', 'head', 'neck', 'shoulder', 'back', 'chest', 'tabard', 'shirt', 'wrist', 'hands', 'belt', 'legs', 'feet', 'ring1', 'ring2', 'trinket1', 'trinket2', 'weapon1', 'weapon2']
         alts = []
         for alt in queryset:
             avg_level = []
             temp = []
             for field in fields:
                 if '.' in field:
-                    temp.append(getattr(alt.alt, field[1:]))
+                    if '_' in field:
+                        temp.append(getattr(alt.alt, field[1:])())
+                    else:
+                        temp.append(getattr(alt.alt, field[1:]))
                 else:
                     if getattr(alt, field) != '0':
                         equipment, variant = getattr(alt, field).split(':')
@@ -264,9 +309,9 @@ class ProfileAltEquipmentView(viewsets.ModelViewSet):
                 avg_level.pop()
                 avg_level.append(avg_level[-1])
             avg_level = sum(avg_level) / 16
-            temp.insert(2, '{0:.2f}'.format(avg_level))
+            temp.insert(3, '{0:.2f}'.format(avg_level))
             alts.append(temp)
-        return response.Response(sorted(alts, key=lambda x: float(x[2]), reverse=True))
+        return response.Response(sorted(alts, key=lambda x: float(x[3]), reverse=True))
 
 
 class BnetLogin(viewsets.ViewSet):
@@ -368,13 +413,13 @@ class DataScan(viewsets.ViewSet):
 
 
 ##########################################################################################
-class FileUpload(viewsets.ViewSet):
-    def create(self, request):
-        print(request.data.get('file'))
-        user_file = request.data.get('file')
-        file_name = str(user_file)
-        with open("media/uploads/{}".format(file_name), 'wb+') as f:
-            for chunk in user_file.chunks():
-                f.write(chunk)
-        return response.Response('yes')
+# class FileUpload(viewsets.ViewSet):
+#     def create(self, request):
+#         print(request.data.get('file'))
+#         user_file = request.data.get('file')
+#         file_name = str(user_file)
+#         with open("media/uploads/{}".format(file_name), 'wb+') as f:
+#             for chunk in user_file.chunks():
+#                 f.write(chunk)
+#         return response.Response('yes')
 ##########################################################################################
