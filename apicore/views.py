@@ -88,13 +88,16 @@ class ProfileUserView(viewsets.ModelViewSet):
     def perform_update(self, serializer):
         user = serializer.validated_data.get('userId')
         file = serializer.validated_data.get('userFile')
-
-        obj_user = ProfileUser.objects.get(userId=user)
-        try:
-            os.remove(os.getcwd() + obj_user.userFile.url)
-        except Exception as e:
-            print(e)
-        serializer.save(userId=user, file=file)
+        # print(file.read().decode('utf-8')[1:14])
+        if file.read().decode('utf-8')[1:14] == 'FazzScraperDB':
+            obj_user = ProfileUser.objects.get(userId=user)
+            try:
+                os.remove(os.getcwd() + obj_user.userFile.url)
+            except Exception as e:
+                print(e)
+            serializer.save(userId=user, file=file)
+        else:
+            print("File not valid")
 
     def list(self, request):
         user = request.query_params.get('user')
@@ -108,30 +111,43 @@ class ProfileUserView(viewsets.ModelViewSet):
         temp3 = temp2.read()
         temp6 = (temp3.decode('utf-8'))
         temp6 = temp6.replace('[', '')
-        temp6 = temp6.replace(']', '')
-        temp6 = temp6.replace('=', ':')
+        # temp6 = temp6.replace(']', '')
+        # temp6 = temp6.replace('=', ':')
+        temp6 = temp6.replace('] =', ' :')
         temp6 = temp6[17:]
         temp6 = temp6.replace('\n', '')
         temp6 = temp6.replace('\t', '')
         temp6 = temp6.replace('{}', 'None')
         temp7 = ast.literal_eval(temp6)
-        result = []
-        for item in temp7['alts']:
-            print(item)
-            specs = []
-            if temp7['alts'][item]['kb'] is not None:
-                for spec in temp7['alts'][item]['kb']:
-                    specs.append(spec)
-            else:
-                specs = ['---', '---', '---', '---']
-            specs.sort()
-            while len(specs) < 4:
-                specs.append('---')
-            temp8 = item.split('-')
-            test = ProfileAlt.objects.get(altName=temp8[0], altRealm=temp8[1])
-            temp8.append(test.get_altClass_display())
-            temp8.extend(specs)
-            result.append(temp8)
+        if request.query_params.get('page') == 'all':
+            result = []
+            for item in temp7['alts']:
+                # print(item)
+                specs = []
+                if temp7['alts'][item]['kb'] is not None:
+                    for spec in temp7['alts'][item]['kb']:
+                        specs.append(spec)
+                else:
+                    specs = ['---', '---', '---', '---']
+                specs.sort()
+                while len(specs) < 4:
+                    specs.append('---')
+                temp8 = item.split('-')
+                test = ProfileAlt.objects.get(altName=temp8[0], altRealm=temp8[1])
+                temp8.append(test.get_altClass_display())
+                temp8.extend(specs)
+                result.append(temp8)
+        elif request.query_params.get('page') == 'single':
+            alt = request.query_params.get('alt').title()
+            realm = request.query_params.get('realm').title()
+            spec = request.query_params.get('spec').title()
+            altFull = alt + '-' + realm
+            # print(temp7['alts'][altFull]['kbConfig']['map'])
+            for item in temp7['alts'][altFull]['kbConfig']['map']:
+                print('{} maps to {}'.format(item, temp7['alts'][altFull]['kbConfig']['map'][item]))
+            result = [alt, realm, spec]
+        else:
+            result = ['sadge']
         return response.Response(result)
 
 
