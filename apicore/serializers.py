@@ -61,7 +61,7 @@ class DataMountSerializer(serializers.HyperlinkedModelSerializer):
 class ProfileUserSerializer(serializers.HyperlinkedModelSerializer):
     class Meta:
         model = ProfileUser
-        fields = ('userId', 'userFile')
+        fields = ('userId', 'userFile', 'userLastUpdate')
 
 
 class ProfileUserMountSerializer(serializers.HyperlinkedModelSerializer):

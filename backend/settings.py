@@ -150,6 +150,6 @@ CORS_ALLOWED_ORIGINS = [
     'https://fazztools.hopto.org'
 ]
 
-REST_FRAMEWORK = {
-    "DATE_INPUT_FORMATS": ["%Y-%m-%d %H:%M"],
-}
+# REST_FRAMEWORK = {
+#     "DATE_INPUT_FORMATS": ["%Y-%m-%d %H:%M"],
+# }

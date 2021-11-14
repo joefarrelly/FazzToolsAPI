@@ -8,6 +8,7 @@ from apicore.models import *
 import requests
 from django.utils import timezone
 import datetime
+import time
 import hashlib
 import hmac
 from ratelimit import limits, sleep_and_retry
@@ -89,13 +90,14 @@ class ProfileUserView(viewsets.ModelViewSet):
         user = serializer.validated_data.get('userId')
         file = serializer.validated_data.get('userFile')
         # print(file.read().decode('utf-8')[1:14])
-        if file.read().decode('utf-8')[1:14] == 'FazzScraperDB':
+        if file.read().decode('utf-8')[1:19] == 'FazzToolsScraperDB':
             obj_user = ProfileUser.objects.get(userId=user)
+            updateDate = obj_user.userLastUpdate
             try:
                 os.remove(os.getcwd() + obj_user.userFile.url)
             except Exception as e:
                 print(e)
-            serializer.save(userId=user, file=file)
+            serializer.save(userId=user, userFile=file, userLastUpdate=updateDate)
         else:
             print("File not valid")
 
@@ -106,48 +108,59 @@ class ProfileUserView(viewsets.ModelViewSet):
             queryset = {}
         else:
             queryset = queryset.filter(userId=user)
-        temp = queryset[0].userFile
-        temp2 = temp.file.open('r')
-        temp3 = temp2.read()
-        temp6 = (temp3.decode('utf-8'))
-        temp6 = temp6.replace('[', '')
-        # temp6 = temp6.replace(']', '')
-        # temp6 = temp6.replace('=', ':')
-        temp6 = temp6.replace('] =', ' :')
-        temp6 = temp6[17:]
-        temp6 = temp6.replace('\n', '')
-        temp6 = temp6.replace('\t', '')
-        temp6 = temp6.replace('{}', 'None')
-        temp7 = ast.literal_eval(temp6)
-        if request.query_params.get('page') == 'all':
-            result = []
-            for item in temp7['alts']:
-                # print(item)
-                specs = []
-                if temp7['alts'][item]['kb'] is not None:
-                    for spec in temp7['alts'][item]['kb']:
-                        specs.append(spec)
-                else:
-                    specs = ['---', '---', '---', '---']
-                specs.sort()
-                while len(specs) < 4:
-                    specs.append('---')
-                temp8 = item.split('-')
-                test = ProfileAlt.objects.get(altName=temp8[0], altRealm=temp8[1])
-                temp8.append(test.get_altClass_display())
-                temp8.extend(specs)
-                result.append(temp8)
-        elif request.query_params.get('page') == 'single':
-            alt = request.query_params.get('alt').title()
-            realm = request.query_params.get('realm').title()
-            spec = request.query_params.get('spec').title()
-            altFull = alt + '-' + realm
-            # print(temp7['alts'][altFull]['kbConfig']['map'])
-            for item in temp7['alts'][altFull]['kbConfig']['map']:
-                print('{} maps to {}'.format(item, temp7['alts'][altFull]['kbConfig']['map'][item]))
-            result = [alt, realm, spec]
+        result = []
+        if request.query_params.get('page') is None:
+            queryset = ProfileUser.objects.all()
+            return response.Response('hey')
+        elif request.query_params.get('page') == 'header':
+            tempDate = queryset[0].userLastUpdate
+            temp2Date = time.mktime(tempDate.timetuple()) * 1000
+            result.append(temp2Date)
         else:
-            result = ['sadge']
+            if queryset[0].userFile:
+                temp = queryset[0].userFile
+                temp2 = temp.file.open('r')
+                temp3 = temp2.read()
+                temp6 = (temp3.decode('utf-8'))
+                temp6 = temp6.replace('[', '')
+                # temp6 = temp6.replace(']', '')
+                # temp6 = temp6.replace('=', ':')
+                temp6 = temp6.replace('] =', ' :')
+                temp6 = temp6[22:].strip()
+                temp6 = temp6.replace('\n', '')
+                temp6 = temp6.replace('\t', '')
+                temp6 = temp6.replace('{}', 'None')
+                temp7 = ast.literal_eval(temp6)
+                if request.query_params.get('page') == 'all':
+                    for item in temp7['alts']:
+                        # print(item)
+                        specs = []
+                        if temp7['alts'][item]['kb'] is not None:
+                            for spec in temp7['alts'][item]['kb']:
+                                specs.append(spec)
+                        else:
+                            specs = ['---', '---', '---', '---']
+                        specs.sort()
+                        while len(specs) < 4:
+                            specs.append('---')
+                        temp8 = item.split('-')
+                        test = ProfileAlt.objects.get(altName=temp8[0], altRealm=temp8[1])
+                        temp8.append(test.get_altClass_display())
+                        temp8.extend(specs)
+                        result.append(temp8)
+                elif request.query_params.get('page') == 'single':
+                    alt = request.query_params.get('alt').title()
+                    realm = request.query_params.get('realm').title()
+                    spec = request.query_params.get('spec').title()
+                    altFull = alt + '-' + realm
+                    # print(temp7['alts'][altFull]['kbConfig']['map'])
+                    for item in temp7['alts'][altFull]['kbConfig']['map']:
+                        print('{} maps to {}'.format(item, temp7['alts'][altFull]['kbConfig']['map'][item]))
+                    result = [alt, realm, spec]
+                else:
+                    result = ['sadge']
+            else:
+                result = []
         return response.Response(result)
 
 
@@ -349,7 +362,8 @@ class BnetLogin(viewsets.ViewSet):
                     except ProfileUser.DoesNotExist:
                         user_obj = ProfileUser.objects.create(
                             userId=result,
-                            userFile=''
+                            userFile='',
+                            userLastUpdate=timezone.now()
                         )
                     altId = []
                     test1 = y.json()['wow_accounts']

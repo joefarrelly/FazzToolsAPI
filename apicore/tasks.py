@@ -980,6 +980,8 @@ def fullAltScan(user, client, secret):
         alts.append(alt.altId)
     total = len(alts)
     user_obj = ProfileUser.objects.get(userId=user)
+    user_obj.userLastUpdate = timezone.now()
+    user_obj.save()
     for index, alt in enumerate(alts, start=1):
         print(counter)
         print('Processing: {} of {}'.format(index, total))

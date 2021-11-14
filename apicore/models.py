@@ -130,6 +130,7 @@ class DataMount(models.Model):
 class ProfileUser(models.Model):
     userId = models.CharField(max_length=100, primary_key=True)
     userFile = models.FileField(upload_to='uploads')
+    userLastUpdate = models.DateTimeField()
 
     class Meta:
         db_table = 'ft_profile_user'
