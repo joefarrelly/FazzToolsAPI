@@ -89,8 +89,15 @@ class ProfileUserView(viewsets.ModelViewSet):
     def perform_update(self, serializer):
         user = serializer.validated_data.get('userId')
         file = serializer.validated_data.get('userFile')
-        # print(file.read().decode('utf-8')[1:14])
+        # print(file.read().decode('utf-8')[1:19])
+        # print('FazzToolsScraperDB')
+        # print(file.read().decode('utf-8')[1:19] == 'FazzToolsScraperDB')
+        # testing = file.read().decode('utf-8')[1:19]
+        # print((testing.strip()) == 'FazzToolsScraperDB')
+        # print(len(testing))
+        # print(len('FazzToolsScraperDB'))
         if file.read().decode('utf-8')[1:19] == 'FazzToolsScraperDB':
+            print("here")
             obj_user = ProfileUser.objects.get(userId=user)
             updateDate = obj_user.userLastUpdate
             try:
