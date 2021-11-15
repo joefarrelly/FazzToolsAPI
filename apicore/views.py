@@ -102,22 +102,22 @@ class ProfileUserView(viewsets.ModelViewSet):
             print(file.name)
             if file.size < 10000000:
                 print(file.size)
-                if file.content_type == 'text/x-lua':
-                    print(file.content_type)
-                    fileCheck = file.read().decode('utf-8')[1:21]
-                    if fileCheck == 'FazzToolsScraperDB =':
-                        print("here")
-                        obj_user = ProfileUser.objects.get(userId=user)
-                        updateDate = obj_user.userLastUpdate
-                        try:
-                            os.remove(os.getcwd() + obj_user.userFile.url)
-                        except Exception as e:
-                            print(e)
-                        serializer.save(userId=user, userFile=file, userLastUpdate=updateDate)
-                    else:
-                        print("Invalid 4")
+                # if file.content_type == 'text/x-lua':
+                #     print(file.content_type)
+                fileCheck = file.read().decode('utf-8')[1:21]
+                if fileCheck == 'FazzToolsScraperDB =':
+                    print("here")
+                    obj_user = ProfileUser.objects.get(userId=user)
+                    updateDate = obj_user.userLastUpdate
+                    try:
+                        os.remove(os.getcwd() + obj_user.userFile.url)
+                    except Exception as e:
+                        print(e)
+                    serializer.save(userId=user, userFile=file, userLastUpdate=updateDate)
                 else:
-                    print("Invalid 1")
+                    print("Invalid 4")
+                # else:
+                #     print("Invalid 1")
             else:
                 print("Invalid 2")
         else:
