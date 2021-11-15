@@ -104,8 +104,10 @@ class ProfileUserView(viewsets.ModelViewSet):
                 print(file.size)
                 # if file.content_type == 'text/x-lua':
                 #     print(file.content_type)
-                fileCheck = file.read().decode('utf-8')[1:21]
-                if fileCheck == 'FazzToolsScraperDB =':
+                # fileCheck = file.read().decode('utf-8')[1:21]
+                fileCheck = file.read()
+                # print(fileCheck[1:19])
+                if fileCheck[1:19].decode('utf-8') == 'FazzToolsScraperDB':
                     print("here")
                     obj_user = ProfileUser.objects.get(userId=user)
                     updateDate = obj_user.userLastUpdate
