@@ -18,6 +18,7 @@ from requests.adapters import HTTPAdapter
 from requests.packages.urllib3.util.retry import Retry
 
 from apicore.tasks import fullDataScan, fullAltScan
+from apicore.action_to_keybind_mapping import setMapping
 
 import environ
 
@@ -180,10 +181,28 @@ class ProfileUserView(viewsets.ModelViewSet):
                     realm = request.query_params.get('realm').title()
                     spec = request.query_params.get('spec').title()
                     altFull = alt + '-' + realm
+                    alt_config = temp7['alts'][altFull]
                     # print(temp7['alts'][altFull]['kbConfig']['map'])
+                    # print(temp7['alts'][altFull]['kbConfig']['addon'])
+                    # keybind_map = setMapping(temp7['alts'][altFull]['kbConfig']['addon'])
+                    keybind_map = setMapping(alt_config['kbConfig']['addon'])
+                    print(keybind_map)
+                    # print(alt_config['kbConfig']['map'])
+                    num_count = 0
+                    for spell in alt_config['kb'][spec]:
+                        try:
+                            print('{} - {} --- {} - {}'.format(spell, alt_config['kb'][spec][spell], keybind_map[int(spell)], alt_config['kbConfig']['map'][keybind_map[int(spell)]]))
+                            result.append([spell, alt_config['kb'][spec][spell], keybind_map[int(spell)], alt_config['kbConfig']['map'][keybind_map[int(spell)]]])
+                            num_count += 1
+                        except KeyError as e:
+                            # print('{} - {} --- {} - {}'.format(spell, alt_config['kb'][spec][spell], keybind_map[int(spell)], e))
+                            pass
+                    print(num_count)
                     for item in temp7['alts'][altFull]['kbConfig']['map']:
-                        print('{} maps to {}'.format(item, temp7['alts'][altFull]['kbConfig']['map'][item]))
-                    result = [alt, realm, spec]
+                        ##################################
+                        # print('{} maps to {}'.format(item, temp7['alts'][altFull]['kbConfig']['map'][item]))
+                        pass
+                    # result = [alt, realm, spec]
                 else:
                     result = ['sadge']
             else:
