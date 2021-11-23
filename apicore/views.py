@@ -241,29 +241,31 @@ class ProfileUserView(viewsets.ModelViewSet):
                         elif nice_spell.split(':')[0] == 'macro':
                             found = False
                             # print(alt_config['macro'][int(nice_spell.split(':')[1])][3])
-                            for name_spell in alt_config['spell'][spec]['base']:
-                                # if alt_config['spell'][spec]['base'][name_spell][1] in alt_config['macro'][int(nice_spell.split(':')[1])][3]:
-                                if alt_config['spell'][spec]['base'][name_spell][1] in alt_config['macro'][nice_spell.split(':')[1]][3]:
-                                    found = True
-                                    # print(alt_config['spell'][spec]['base'][name_spell][1])
-                                    # print('here')
-                                    # if not user_keybind.get(int(name_spell)):
-                                    if not user_keybind.get('spell:' + str(name_spell)):
-                                        try:
-                                            # user_keybind[int(name_spell)] = alt_config['kbConfig']['map'][keybind_map[int(spell)]]
-                                            user_keybind['spell:' + str(name_spell)] = alt_config['kbConfig']['map'][keybind_map[int(spell)]]
-                                        except:
-                                            pass
-                                    else:
-                                        # user_keybind[int(name_spell)] += " | " + alt_config['kbConfig']['map'][keybind_map[int(spell)]]
-                                        user_keybind['spell:' + str(name_spell)] += " | " + alt_config['kbConfig']['map'][keybind_map[int(spell)]]
-                            if not found:
-                                # print(alt_config['macro'][int(nice_spell.split(':')[1])][3])
-                                # print(alt_config['macro'][int(nice_spell.split(':')[1])][1])
-                                try:
-                                    user_keybind[nice_spell] = alt_config['kbConfig']['map'][keybind_map[int(spell)]]
-                                except:
-                                    pass
+                            for thing in alt_config['spell'][spec]:
+                                for name_spell in alt_config['spell'][spec][thing]:
+                                    # if alt_config['spell'][spec]['base'][name_spell][1] in alt_config['macro'][int(nice_spell.split(':')[1])][3]:
+                                    if alt_config['spell'][spec][thing][name_spell][1] in alt_config['macro'][nice_spell.split(':')[1]][3]:
+                                        found = True
+                                        # print(alt_config['spell'][spec]['base'][name_spell][1])
+                                        # print('here')
+                                        # if not user_keybind.get(int(name_spell)):
+                                        if not user_keybind.get('spell:' + str(name_spell)):
+                                            try:
+                                                # user_keybind[int(name_spell)] = alt_config['kbConfig']['map'][keybind_map[int(spell)]]
+                                                user_keybind['spell:' + str(name_spell)] = alt_config['kbConfig']['map'][keybind_map[int(spell)]]
+                                            except:
+                                                pass
+                                        else:
+                                            # user_keybind[int(name_spell)] += " | " + alt_config['kbConfig']['map'][keybind_map[int(spell)]]
+                                            if user_keybind['spell:' + str(name_spell)] != alt_config['kbConfig']['map'][keybind_map[int(spell)]]:
+                                                user_keybind['spell:' + str(name_spell)] += " | " + alt_config['kbConfig']['map'][keybind_map[int(spell)]]
+                                if not found:
+                                    # print(alt_config['macro'][int(nice_spell.split(':')[1])][3])
+                                    # print(alt_config['macro'][int(nice_spell.split(':')[1])][1])
+                                    try:
+                                        user_keybind[nice_spell] = alt_config['kbConfig']['map'][keybind_map[int(spell)]]
+                                    except:
+                                        pass
                         elif nice_spell.split(':')[0] == 'item':
                             for name_spell in alt_config['item']:
                                 # print('{} - {}'.format(type(name_spell), type(nice_spell.split(':')[1])))
