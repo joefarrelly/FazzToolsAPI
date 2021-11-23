@@ -6,6 +6,7 @@ from requests.adapters import HTTPAdapter
 from requests.packages.urllib3.util.retry import Retry
 from django.utils import timezone
 import datetime
+import ast
 
 item_search_details = [
     [6, 'ability_mount_ridinghorse'],
@@ -1436,3 +1437,62 @@ def fullDataScan(client, secret):
     except KeyError as e:
         print(e)
     return('Done Long Task')
+
+
+# @shared_task
+# def spellScan(keybind_file, client, secret):
+#     total = 0
+#     url = 'https://eu.battle.net/oauth/token?grant_type=client_credentials'
+#     params = {'client_id': client, 'client_secret': secret}
+#     x = requests.post(url, data=params)
+#     try:
+#         token = x.json()['access_token']
+#         dataobj = {'access_token': token, 'namespace': 'static-eu', 'locale': 'en_US'}
+#         # print(keybind_file)
+#         # temp6 = temp6.replace('[', '')
+#         # temp6 = temp6.replace('] =', ' :')
+#         # temp6 = temp6.replace('FazzToolsScraperDB =', '')
+#         # temp6 = temp6.strip()
+#         # temp6 = temp6.replace('\n', '')
+#         # temp6 = temp6.replace('\t', '')
+#         # temp6 = temp6.replace('{}', 'None')
+#         # temp7 = ast.literal_eval(temp6)
+#         # temp = keybind_file.decode('utf-8').replace('[', '').replace('] =', ' :').replace('FazzToolsScraperDB =', '').strip().replace('\n', '').replace('\t', '').replace('{}', 'None')
+#         keybind_dict = ast.literal_eval(keybind_file.replace('[', '').replace('] =', ' :').replace('FazzToolsScraperDB =', '').strip().replace('\n', '').replace('\t', '').replace('{}', 'None'))
+#         for alt in keybind_dict['alts']:
+#             # print(alt)
+#             if keybind_dict['alts'][alt]['kb']:
+#                 for spec in keybind_dict['alts'][alt]['kb']:
+#                     # print(spec)
+#                     if keybind_dict['alts'][alt]['kb'][spec]:
+#                         for keybind in keybind_dict['alts'][alt]['kb'][spec].values():
+#                             # print(keybind)
+#                             if keybind.split(':')[0] == 'spell':
+#                                 # print(keybind)
+#                                 # print(keybind.split(':')[1])
+#                                 url = 'https://eu.api.blizzard.com/data/wow/spell/' + str(keybind.split(':')[1])
+#                                 spell_response = limit_call(url, params=dataobj)
+#                                 if spell_response.status_code == 200:
+#                                     total += 1
+#                                     try:
+#                                         spell_details = spell_response.json()
+#                                         try:
+#                                             obj_spell = DataSpell.objects.get(spellId=spell_details['id'])
+#                                         except DataSpell.DoesNotExist:
+#                                             media_icon = 'https://render.worldofwarcraft.com/eu/icons/56/inv_misc_questionmark.jpg'
+#                                             spell_media_response = limit_call(spell_details['media']['key']['href'], params=dataobj)
+#                                             if spell_media_response.status_code == 200:
+#                                                 media_icon = spell_media_response.json()['assets'][0]['value']
+#                                             obj_spell = DataSpell.objects.create(
+#                                                 spellId=spell_details['id'],
+#                                                 spellName=spell_details['name'],
+#                                                 spellDescription=spell_details['description'],
+#                                                 spellMediaIcon=media_icon
+#                                             )
+#                                     except KeyError as e:
+#                                         print(e)
+#                                 else:
+#                                     print('{} - {}'.format(spell_response.status_code, keybind))
+#     except KeyError as e:
+#         print(e)
+#     print('{} spells scanned'.format(total))

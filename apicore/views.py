@@ -18,13 +18,15 @@ from requests.adapters import HTTPAdapter
 from requests.packages.urllib3.util.retry import Retry
 
 from apicore.tasks import fullDataScan, fullAltScan
-from apicore.action_to_keybind_mapping import setMapping
+from apicore.libs.keybind_mapping import getKeybindMap
+from apicore.libs.icon_mapping import getIconMap
 
 import environ
 
 import os
 
 import ast
+import re
 
 env = environ.Env()
 environ.Env.read_env()
@@ -146,9 +148,26 @@ class ProfileUserView(viewsets.ModelViewSet):
             if queryset[0].userFile:
                 temp = queryset[0].userFile
                 temp2 = temp.file.open('r')
-                temp3 = temp2.read()
-                temp6 = (temp3.decode('utf-8'))
-                temp6 = temp6.replace('[', '')
+                # temp3 = temp2.read()
+                temp3 = temp2.readlines()
+                # temp6 = temp3.decode('utf-8')
+                tempresult = ''
+                for line in temp3:
+                    line = line.decode('utf-8')
+                    tempresult += re.sub(r'(^\s+)(.+)--\s(\[\d+\]$)', r'\1\3 = \2', line)
+                # temp6 = result
+                # print(temp6)
+                # temp6 = temp6.replace('-- [1]', '')
+                # temp6 = temp6.replace('-- [2]', '')
+                # temp6 = temp6.replace('-- [3]', '')
+                # temp6 = temp6.replace('-- [4]', '')
+                # temp6 = temp6.replace('[', '')
+                # temp6 = tempresult.replace('[', '')
+                temp6 = re.sub(r'\[(?=(?:[^"]*"[^"]*")*[^"]*$)', '', tempresult)
+                # temp16 = re.sub(r'\](?=(?:[^"]*"[^"]*")*[^"]*$)', '', temp6)
+                # temp26 = re.sub(r'\=(?=(?:[^"]*"[^"]*")*[^"]*$)', ':', temp16)
+                # print(temp6)
+                # temp6 = temp26
                 # temp6 = temp6.replace(']', '')
                 # temp6 = temp6.replace('=', ':')
                 temp6 = temp6.replace('] =', ' :')
@@ -159,6 +178,8 @@ class ProfileUserView(viewsets.ModelViewSet):
                 temp6 = temp6.replace('\t', '')
                 temp6 = temp6.replace('{}', 'None')
                 temp7 = ast.literal_eval(temp6)
+                # print(temp6)
+                # print(temp7)
                 if request.query_params.get('page') == 'all':
                     for item in temp7['alts']:
                         # print(item)
@@ -176,35 +197,114 @@ class ProfileUserView(viewsets.ModelViewSet):
                         temp8.append(test.get_altClass_display())
                         temp8.extend(specs)
                         result.append(temp8)
+                    result.sort(key=lambda x: (x[1], x[0]))
                 elif request.query_params.get('page') == 'single':
+                    ########################
                     alt = request.query_params.get('alt').title()
                     realm = request.query_params.get('realm').title()
                     spec = request.query_params.get('spec').title()
                     altFull = alt + '-' + realm
                     alt_config = temp7['alts'][altFull]
-                    # print(temp7['alts'][altFull]['kbConfig']['map'])
-                    # print(temp7['alts'][altFull]['kbConfig']['addon'])
-                    # keybind_map = setMapping(temp7['alts'][altFull]['kbConfig']['addon'])
-                    keybind_map = setMapping(alt_config['kbConfig']['addon'])
-                    print(keybind_map)
-                    # print(alt_config['kbConfig']['map'])
-                    num_count = 0
+                    keybind_map = getKeybindMap(alt_config['kbConfig']['addon'])
+                    # num_count = 0
+                    user_keybind = {}
                     for spell in alt_config['kb'][spec]:
-                        try:
-                            print('{} - {} --- {} - {}'.format(spell, alt_config['kb'][spec][spell], keybind_map[int(spell)], alt_config['kbConfig']['map'][keybind_map[int(spell)]]))
-                            result.append([spell, alt_config['kb'][spec][spell], keybind_map[int(spell)], alt_config['kbConfig']['map'][keybind_map[int(spell)]]])
-                            num_count += 1
-                        except KeyError as e:
-                            # print('{} - {} --- {} - {}'.format(spell, alt_config['kb'][spec][spell], keybind_map[int(spell)], e))
-                            pass
-                    print(num_count)
-                    for item in temp7['alts'][altFull]['kbConfig']['map']:
-                        ##################################
-                        # print('{} maps to {}'.format(item, temp7['alts'][altFull]['kbConfig']['map'][item]))
-                        pass
-                    # result = [alt, realm, spec]
+                        nice_spell = alt_config['kb'][spec][spell]
+                        if nice_spell.split(':')[0] == 'spell':
+                            # print(alt_config['kb'][spec][spell].split(':')[1])
+                            try:
+                                # print(alt_config['kbConfig']['map'][keybind_map[int(spell)]])
+                                # user_keybind[int(nice_spell.split(':')[1])] = alt_config['kbConfig']['map'][keybind_map[int(spell)]]
+                                user_keybind[nice_spell] = alt_config['kbConfig']['map'][keybind_map[int(spell)]]
+                            except:
+                                pass
+                        elif nice_spell.split(':')[0] == 'macro':
+                            found = False
+                            # print(alt_config['macro'][int(nice_spell.split(':')[1])][3])
+                            for name_spell in alt_config['spell'][spec]['base']:
+                                # if alt_config['spell'][spec]['base'][name_spell][1] in alt_config['macro'][int(nice_spell.split(':')[1])][3]:
+                                if alt_config['spell'][spec]['base'][name_spell][1] in alt_config['macro'][nice_spell.split(':')[1]][3]:
+                                    found = True
+                                    # print(alt_config['spell'][spec]['base'][name_spell][1])
+                                    # print('here')
+                                    # if not user_keybind.get(int(name_spell)):
+                                    if not user_keybind.get('spell:' + str(name_spell)):
+                                        try:
+                                            # user_keybind[int(name_spell)] = alt_config['kbConfig']['map'][keybind_map[int(spell)]]
+                                            user_keybind['spell:' + str(name_spell)] = alt_config['kbConfig']['map'][keybind_map[int(spell)]]
+                                        except:
+                                            pass
+                                    else:
+                                        # user_keybind[int(name_spell)] += " | " + alt_config['kbConfig']['map'][keybind_map[int(spell)]]
+                                        user_keybind['spell:' + str(name_spell)] += " | " + alt_config['kbConfig']['map'][keybind_map[int(spell)]]
+                            if not found:
+                                # print(alt_config['macro'][int(nice_spell.split(':')[1])][3])
+                                # print(alt_config['macro'][int(nice_spell.split(':')[1])][1])
+                                try:
+                                    user_keybind[nice_spell] = alt_config['kbConfig']['map'][keybind_map[int(spell)]]
+                                except:
+                                    pass
+                        elif nice_spell.split(':')[0] == 'item':
+                            for name_spell in alt_config['item']:
+                                # print('{} - {}'.format(type(name_spell), type(nice_spell.split(':')[1])))
+                                # if name_spell == int(nice_spell.split(':')[1]):
+                                if name_spell == nice_spell.split(':')[1]:
+                                    # print(alt_config['item'][name_spell][1])
+                                    try:
+                                        user_keybind[nice_spell] = alt_config['kbConfig']['map'][keybind_map[int(spell)]]
+                                    except:
+                                        pass
+                    # print(user_keybind)
+                    # print(user_keybind)
+                    alt = request.query_params.get('alt').title()
+                    realm = request.query_params.get('realm').title()
+                    spec = request.query_params.get('spec').title()
+                    altFull = alt + '-' + realm
+                    alt_config = temp7['alts'][altFull]
+                    alt_obj = ProfileAlt.objects.get(altName=alt, altRealm=realm)
+                    # print(alt_obj)
+                    user_class = alt_obj.get_altClass_display()
+                    # print(user_class)
+                    # search_spells = ['General', user_class, spec]
+                    SPELLS_ORDER = {'Base': 0, 'Talent': 1, 'Misc': 2}
+                    spam_filter = ['Auto Attack', 'Mobile Banking', 'Revive Battle Pets', 'Vindicaar Matrix Crystal', 'Shoot']
+                    # print(alt_config['spell'])
+                    full_result = []
+                    for tab in alt_config['spell'][spec]:
+                        list_spells = []
+                        for spell in alt_config['spell'][spec][tab]:
+                            if alt_config['spell'][spec][tab][spell][1] in spam_filter:
+                                continue
+                            list_spell_single = []
+                            for stat in alt_config['spell'][spec][tab][spell]:
+                                if stat == 1:
+                                    list_spell_single.append(alt_config['spell'][spec][tab][spell][stat])
+                            try:
+                                list_spell_single.append(user_keybind['spell:' + str(spell)])
+                            except:
+                                list_spell_single.append('UNBOUND')
+                            list_spells.append(list_spell_single)
+                        list_spells = sorted(list_spells, key=lambda x: x[0])
+                        full_result.append([tab.title(), list_spells])
+                    list_spells = []
+                    for item in alt_config['item']:
+                        # list_spell_single = []
+                        if user_keybind.get('item:' + str(item)):
+                            # print(alt_config['item'][item])
+                            # print(user_keybind['item:' + str(item)])
+                            list_spells.append([alt_config['item'][item][1], user_keybind['item:' + str(item)]])
+                    for macro in alt_config['macro']:
+                        if user_keybind.get('macro:' + str(macro)):
+                            # print('ye')
+                            list_spells.append(['[Macro] {}'.format(alt_config['macro'][macro][1]), user_keybind['macro:' + str(macro)]])
+                    list_spells = sorted(list_spells, key=lambda x: x[0])
+                    full_result.append(['Misc', list_spells])
+                    result = sorted(full_result, key=lambda x: SPELLS_ORDER[x[0]])
+                    testing1 = [x for x in result[0][1] if x not in result[1][1]]
+                    result[0][1] = testing1
                 else:
                     result = ['sadge']
+                temp.file.close()
             else:
                 result = []
         return response.Response(result)

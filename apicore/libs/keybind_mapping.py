@@ -249,7 +249,7 @@ MAPPING_BARTENDER = None
 MAPPING_ELVUI = None
 
 
-def setMapping(addon):
+def getKeybindMap(addon):
     if addon == 'Dominos':
         result = MAPPING_DOMINOS
     elif addon == 'Bartender':
