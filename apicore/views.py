@@ -113,6 +113,23 @@ class ProfileUserView(viewsets.ModelViewSet):
                 # if fileCheck[1:19].decode('utf-8') == 'FazzToolsScraperDB':
                 if 'FazzToolsScraperDB' in fileCheck[0:25].decode('utf-8'):
                     print("here")
+                    # print(file.url)
+                    # print(type(fileCheck))
+                    # print(type(fileCheck.decode('utf-8')))
+                    # temp = fileCheck.decode('utf-8')
+                    # print(temp)
+                    # # print(type(temp))
+                    # # temp2 = temp.encode()
+                    # # print(type(temp2))
+                    # # temp = temp.replace('\r\n')
+                    # temp2 = re.sub(r'\\r\\n(?=(?:[^"]*"[^"]*")*[^"]*$)', '\\n', temp)
+                    # print(temp2)
+                    # temp = fileCheck.decode('utf-8')
+                    # print(repr(temp[0:250]))
+                    # print(temp[0:250])
+                    # temp2 = re.sub(r'(\r\n|\r|\n)(?=(?:[^"]*"[^"]*")*[^"]*$)', '\n', temp)
+                    # print(repr(temp2[0:250]))
+                    # print(temp2[0:250])
                     obj_user = ProfileUser.objects.get(userId=user)
                     updateDate = obj_user.userLastUpdate
                     try:
@@ -151,10 +168,13 @@ class ProfileUserView(viewsets.ModelViewSet):
                 # temp3 = temp2.read()
                 temp3 = temp2.readlines()
                 # temp6 = temp3.decode('utf-8')
+                # print(repr(temp3))
                 tempresult = ''
                 for line in temp3:
                     line = line.decode('utf-8')
-                    tempresult += re.sub(r'(^\s+)(.+)--\s(\[\d+\]$)', r'\1\3 = \2', line)
+                    line2 = re.sub(r'(\r\n|\r|\n)(?=(?:[^"]*"[^"]*")*[^"]*$)', '\n', line)
+                    tempresult += re.sub(r'(^\s+)(.+)--\s(\[\d+\]$)', r'\1\3 = \2', line2)
+                # print(tempresult)
                 # temp6 = result
                 # print(temp6)
                 # temp6 = temp6.replace('-- [1]', '')
