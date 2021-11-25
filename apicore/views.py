@@ -118,9 +118,7 @@ class ProfileUserView(viewsets.ModelViewSet):
                     final_file = re.sub(r'(\r\n|\r|\n)(?=(?:[^"]*"[^"]*")*[^"]*$)', r'\n', fileCheck)
                     f.seek(0)
                     f.write(final_file.encode())
-                    # file.open('w')
-                    # print(type(f.read()))
-                    # hope = 'Content has gone'.encode()
+                    f.truncate()
                     obj_user = ProfileUser.objects.get(userId=user)
                     updateDate = obj_user.userLastUpdate
                     try:
