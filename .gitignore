@@ -3,3 +3,5 @@
 .env
 /media/uploads
 mapping.txt
+FazzToolsScraper.lua
+test.py

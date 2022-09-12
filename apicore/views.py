@@ -305,12 +305,38 @@ class ProfileUserMountView(viewsets.ModelViewSet):
         else:
             queryset = queryset.filter(user=user).select_related('mount').order_by('mount__mountName')
         mounts = {}
-        for mount in queryset:
-            try:
-                mounts[mount.mount.mountSource].append([mount.mount.mountName, mount.mount.mountMediaIcon])
-            except KeyError as e:
-                mounts[mount.mount.mountSource] = [[mount.mount.mountName, mount.mount.mountMediaIcon]]
-        queryset = list(map(list, mounts.items()))
+        all_mounts = DataMount.objects.all().order_by('mountName')
+        # print(all_mounts[1])
+        # print(queryset)
+        counter = 0
+        for mount in all_mounts:
+            if mount.mountId == queryset[counter].mount.mountId:
+                try:
+                    mounts[mount.mountSource]
+                except KeyError as e:
+                    mounts[mount.mountSource] = {}
+                try:
+                    mounts[mount.mountSource]['collected'].append({'name': mount.mountName, 'icon': mount.mountMediaIcon})
+                except KeyError as e:
+                    mounts[mount.mountSource]['collected'] = [{'name': mount.mountName, 'icon': mount.mountMediaIcon}]
+                counter += 1
+            else:
+                try:
+                    mounts[mount.mountSource]
+                except KeyError as e:
+                    mounts[mount.mountSource] = {}
+                try:
+                    mounts[mount.mountSource]['uncollected'].append({'name': mount.mountName, 'icon': mount.mountMediaIcon})
+                except KeyError as e:
+                    mounts[mount.mountSource]['uncollected'] = [{'name': mount.mountName, 'icon': mount.mountMediaIcon}]
+        # for mount in queryset:
+        #     try:
+        #         mounts[mount.mount.mountSource].append({'name': mount.mount.mountName, 'icon': mount.mount.mountMediaIcon})
+        #     except KeyError as e:
+        #         mounts[mount.mount.mountSource] = [{'name': mount.mount.mountName, 'icon': mount.mount.mountMediaIcon}]
+        # queryset = list(map(list, mounts.items()))
+        queryset = list(mounts.items())
+        # queryset = mounts
         return response.Response(queryset)
 
 
