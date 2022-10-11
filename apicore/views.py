@@ -308,7 +308,10 @@ class ProfileUserMountView(viewsets.ModelViewSet):
         all_mounts = DataMount.objects.all().order_by('mountName')
         # print(all_mounts[1])
         # print(queryset)
+        collected = []
         if queryset:
+            for known in queryset:
+                collected.append(known.mount.mountId)
             counter = 0
             for mount in all_mounts:
                 try:
@@ -323,7 +326,8 @@ class ProfileUserMountView(viewsets.ModelViewSet):
                     mounts[mount.mountSource]['uncollected']
                 except KeyError as e:
                     mounts[mount.mountSource]['uncollected'] = []
-                if mount.mountId == queryset[counter].mount.mountId:
+                # if mount.mountId == queryset[counter].mount.mountId:
+                if mount.mountId in collected:
                     mounts[mount.mountSource]['collected'].append({'name': mount.mountName, 'icon': mount.mountMediaIcon})
                     counter += 1
                 else:
