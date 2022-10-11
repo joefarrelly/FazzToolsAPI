@@ -312,42 +312,48 @@ class ProfileUserMountView(viewsets.ModelViewSet):
         if queryset:
             for known in queryset:
                 collected.append(known.mount.mountId)
-                try:
-                    mounts[known.mount.mountSource]
-                except KeyError as e:
-                    mounts[known.mount.mountSource] = []
-                mounts[known.mount.mountSource].append({'name': known.mount.mountName, 'icon': known.mount.mountMediaIcon})
-            mounts['total'] = len(mounts[known.mount.mountSource])
             # counter = 0
-            # for mount in all_mounts:
+            for mount in all_mounts:
+                try:
+                    mounts[mount.mountSource]
+                except KeyError as e:
+                    mounts[mount.mountSource] = {}
+                try:
+                    mounts[mount.mountSource]['collected']
+                except KeyError as e:
+                    mounts[mount.mountSource]['collected'] = []
+                try:
+                    mounts[mount.mountSource]['uncollected']
+                except KeyError as e:
+                    mounts[mount.mountSource]['uncollected'] = []
+                # if mount.mountId == queryset[counter].mount.mountId:
+                if mount.mountId in collected:
+                    mounts[mount.mountSource]['collected'].append({'name': mount.mountName, 'icon': mount.mountMediaIcon})
+                    # counter += 1
+                else:
+                    mounts[mount.mountSource]['uncollected'].append({'name': mount.mountName, 'icon': mount.mountMediaIcon})
+            # for mount in queryset:
             #     try:
-            #         mounts[mount.mountSource]
+            #         mounts[mount.mount.mountSource].append({'name': mount.mount.mountName, 'icon': mount.mount.mountMediaIcon})
             #     except KeyError as e:
-            #         mounts[mount.mountSource] = {}
-            #     try:
-            #         mounts[mount.mountSource]['collected']
-            #     except KeyError as e:
-            #         mounts[mount.mountSource]['collected'] = []
-            #     try:
-            #         mounts[mount.mountSource]['uncollected']
-            #     except KeyError as e:
-            #         mounts[mount.mountSource]['uncollected'] = []
-            #     # if mount.mountId == queryset[counter].mount.mountId:
-            #     if mount.mountId in collected:
-            #         mounts[mount.mountSource]['collected'].append({'name': mount.mountName, 'icon': mount.mountMediaIcon})
-            #         counter += 1
-            #     else:
-            #         mounts[mount.mountSource]['uncollected'].append({'name': mount.mountName, 'icon': mount.mountMediaIcon})
-            # # for mount in queryset:
-            # #     try:
-            # #         mounts[mount.mount.mountSource].append({'name': mount.mount.mountName, 'icon': mount.mount.mountMediaIcon})
-            # #     except KeyError as e:
-            # #         mounts[mount.mount.mountSource] = [{'name': mount.mount.mountName, 'icon': mount.mount.mountMediaIcon}]
-            # # queryset = list(map(list, mounts.items()))
-            # for category_name, category_data in mounts.items():
-            #     mounts[category_name]['collected_count'] = len(category_data['collected'])
-            #     mounts[category_name]['uncollected_count'] = len(category_data['uncollected'])
-            #     mounts[category_name]['total_count'] = len(category_data['uncollected']) + len(category_data['collected'])
+            #         mounts[mount.mount.mountSource] = [{'name': mount.mount.mountName, 'icon': mount.mount.mountMediaIcon}]
+            # queryset = list(map(list, mounts.items()))
+            known = 0
+            unknown = 0
+            available = 0
+            for category_name, category_data in mounts.items():
+                collected = len(category_data['collected'])
+                uncollected = len(category_data['uncollected'])
+                total = collected + uncollected
+                mounts[category_name]['collected_count'] = collected
+                mounts[category_name]['uncollected_count'] = uncollected
+                mounts[category_name]['total_count'] = total
+                known += collected
+                unknown += uncollected
+                available += total
+            mounts['known'] = known
+            mounts['unknown'] = unknown
+            mounts['available'] = available
 
             queryset = list(mounts.items())
         # queryset = mounts
