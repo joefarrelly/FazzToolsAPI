@@ -308,42 +308,42 @@ class ProfileUserMountView(viewsets.ModelViewSet):
         all_mounts = DataMount.objects.all().order_by('mountName')
         # print(all_mounts[1])
         # print(queryset)
-        collected = []
-        if queryset:
-            for known in queryset:
-                collected.append(known.mount.mountId)
-            counter = 0
-            for mount in all_mounts:
-                try:
-                    mounts[mount.mountSource]
-                except KeyError as e:
-                    mounts[mount.mountSource] = {}
-                try:
-                    mounts[mount.mountSource]['collected']
-                except KeyError as e:
-                    mounts[mount.mountSource]['collected'] = []
-                try:
-                    mounts[mount.mountSource]['uncollected']
-                except KeyError as e:
-                    mounts[mount.mountSource]['uncollected'] = []
-                # if mount.mountId == queryset[counter].mount.mountId:
-                if mount.mountId in collected:
-                    mounts[mount.mountSource]['collected'].append({'name': mount.mountName, 'icon': mount.mountMediaIcon})
-                    counter += 1
-                else:
-                    mounts[mount.mountSource]['uncollected'].append({'name': mount.mountName, 'icon': mount.mountMediaIcon})
-            # for mount in queryset:
-            #     try:
-            #         mounts[mount.mount.mountSource].append({'name': mount.mount.mountName, 'icon': mount.mount.mountMediaIcon})
-            #     except KeyError as e:
-            #         mounts[mount.mount.mountSource] = [{'name': mount.mount.mountName, 'icon': mount.mount.mountMediaIcon}]
-            # queryset = list(map(list, mounts.items()))
-            for category_name, category_data in mounts.items():
-                mounts[category_name]['collected_count'] = len(category_data['collected'])
-                mounts[category_name]['uncollected_count'] = len(category_data['uncollected'])
-                mounts[category_name]['total_count'] = len(category_data['uncollected']) + len(category_data['collected'])
+        # collected = []
+        # if queryset:
+        #     for known in queryset:
+        #         collected.append(known.mount.mountId)
+        #     counter = 0
+        #     for mount in all_mounts:
+        #         try:
+        #             mounts[mount.mountSource]
+        #         except KeyError as e:
+        #             mounts[mount.mountSource] = {}
+        #         try:
+        #             mounts[mount.mountSource]['collected']
+        #         except KeyError as e:
+        #             mounts[mount.mountSource]['collected'] = []
+        #         try:
+        #             mounts[mount.mountSource]['uncollected']
+        #         except KeyError as e:
+        #             mounts[mount.mountSource]['uncollected'] = []
+        #         # if mount.mountId == queryset[counter].mount.mountId:
+        #         if mount.mountId in collected:
+        #             mounts[mount.mountSource]['collected'].append({'name': mount.mountName, 'icon': mount.mountMediaIcon})
+        #             counter += 1
+        #         else:
+        #             mounts[mount.mountSource]['uncollected'].append({'name': mount.mountName, 'icon': mount.mountMediaIcon})
+        #     # for mount in queryset:
+        #     #     try:
+        #     #         mounts[mount.mount.mountSource].append({'name': mount.mount.mountName, 'icon': mount.mount.mountMediaIcon})
+        #     #     except KeyError as e:
+        #     #         mounts[mount.mount.mountSource] = [{'name': mount.mount.mountName, 'icon': mount.mount.mountMediaIcon}]
+        #     # queryset = list(map(list, mounts.items()))
+        #     for category_name, category_data in mounts.items():
+        #         mounts[category_name]['collected_count'] = len(category_data['collected'])
+        #         mounts[category_name]['uncollected_count'] = len(category_data['uncollected'])
+        #         mounts[category_name]['total_count'] = len(category_data['uncollected']) + len(category_data['collected'])
 
-            queryset = list(mounts.items())
+        #     queryset = list(mounts.items())
         # queryset = mounts
         return response.Response(queryset)
 
