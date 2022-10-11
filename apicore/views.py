@@ -313,11 +313,11 @@ class ProfileUserMountView(viewsets.ModelViewSet):
             for known in queryset:
                 collected.append(known.mount.mountId)
                 try:
-                    mounts['collected']
+                    mounts[known.mount.mountSource]
                 except KeyError as e:
-                    mounts['collected'] = []
-                mounts['collected'].append({'name': known.mount.mountName, 'icon': known.mount.mountMediaIcon})
-            mounts['total'] = len(mounts['collected'])
+                    mounts[known.mount.mountSource] = []
+                mounts[known.mount.mountSource].append({'name': known.mount.mountName, 'icon': known.mount.mountMediaIcon})
+            mounts['total'] = len(mounts[known.mount.mountSource])
             # counter = 0
             # for mount in all_mounts:
             #     try:
