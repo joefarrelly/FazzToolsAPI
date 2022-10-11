@@ -338,6 +338,10 @@ class ProfileUserMountView(viewsets.ModelViewSet):
             #     except KeyError as e:
             #         mounts[mount.mount.mountSource] = [{'name': mount.mount.mountName, 'icon': mount.mount.mountMediaIcon}]
             # queryset = list(map(list, mounts.items()))
+            for category_name, category_data in mounts.items():
+                mounts[category_name]['collected_count'] = len(category_data['collected'])
+                mounts[category_name]['uncollected_count'] = len(category_data['uncollected'])
+
             queryset = list(mounts.items())
         # queryset = mounts
         return response.Response(queryset)
