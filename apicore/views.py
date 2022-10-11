@@ -340,6 +340,7 @@ class ProfileUserMountView(viewsets.ModelViewSet):
             # queryset = list(map(list, mounts.items()))
             for category_name, category_data in mounts.items():
                 mounts[category_name]['collected_count'] = len(category_data['collected'])
+                mounts[category_name]['uncollected_count'] = len(category_data['uncollected'])
                 mounts[category_name]['total_count'] = len(category_data['uncollected']) + len(category_data['collected'])
 
             queryset = list(mounts.items())
