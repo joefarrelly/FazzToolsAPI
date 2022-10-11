@@ -316,7 +316,7 @@ class ProfileUserMountView(viewsets.ModelViewSet):
                     mounts['collected']
                 except KeyError as e:
                     mounts['collected'] = []
-                mounts['collected'].append({'name': known.mountName, 'icon': known.mountMediaIcon})
+                mounts['collected'].append({'name': known.mount.mountName, 'icon': known.mount.mountMediaIcon})
             # counter = 0
             # for mount in all_mounts:
             #     try:
