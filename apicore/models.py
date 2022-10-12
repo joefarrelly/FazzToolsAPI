@@ -120,6 +120,18 @@ class DataMount(models.Model):
         db_table = 'ft_data_mount'
 
 
+class DataPet(models.Model):
+    petId = models.PositiveIntegerField(primary_key=True)
+    petName = models.CharField(max_length=100)
+    petDescription = models.CharField(max_length=500)
+    petSource = models.CharField(max_length=50)
+    petMediaIcon = models.CharField(max_length=150)
+    petFaction = models.CharField(max_length=30)
+
+    class Meta:
+        db_table = 'ft_data_pet'
+
+
 #################################################################################
 #                                                                               #
 #                            Data/Profile Separator                             #
@@ -142,6 +154,14 @@ class ProfileUserMount(models.Model):
 
     class Meta:
         db_table = 'ft_profile_usermount'
+
+
+class ProfileUserPet(models.Model):
+    user = models.ForeignKey(ProfileUser, on_delete=models.CASCADE)
+    pet = models.ForeignKey(DataPet, on_delete=models.CASCADE)
+
+    class Meta:
+        db_table = 'ft_profile_userpet'
 
 
 class ProfileAlt(models.Model):

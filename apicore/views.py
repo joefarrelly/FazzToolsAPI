@@ -78,6 +78,11 @@ class DataMountView(viewsets.ModelViewSet):
     queryset = DataMount.objects.all()
 
 
+class PetMountView(viewsets.ModelViewSet):
+    serializer_class = PetMountSerializer
+    queryset = PetMount.objects.all()
+
+
 #################################################################################
 #                                                                               #
 #                            Data/Profile Separator                             #
@@ -360,6 +365,62 @@ class ProfileUserMountView(viewsets.ModelViewSet):
             queryset.append(unknown)
             queryset.append(available)
         # queryset = mounts
+        return response.Response(queryset)
+
+
+class ProfileUserPetView(viewsets.ModelViewSet):
+    serializer_class = ProfileUserPetSerializer
+    queryset = ProfileUserPet.objects.all()
+
+    def list(self, request):
+        user = request.query_params.get('user')
+        queryset = ProfileUserPet.objects.all()
+        if user is None:
+            queryset = {}
+        else:
+            queryset = queryset.filter(user=user).select_related('pet').order_by('pet__petName')
+        pets = {}
+        all_pets = DataPet.objects.all().order_by('petName')
+        collected = []
+        if queryset:
+            for known in queryset:
+                collected.append(known.pet.petId)
+            # counter = 0
+            for pet in all_pets:
+                try:
+                    pets[pet.petSource]
+                except KeyError as e:
+                    pets[pet.petSource] = {}
+                try:
+                    pets[pet.petSource]['collected']
+                except KeyError as e:
+                    pets[pet.petSource]['collected'] = []
+                try:
+                    pets[pet.petSource]['uncollected']
+                except KeyError as e:
+                    pets[pet.petSource]['uncollected'] = []
+                if pet.petId in collected:
+                    pets[pet.petSource]['collected'].append({'name': pet.petName, 'icon': pet.petMediaIcon})
+                else:
+                    pets[pet.petSource]['uncollected'].append({'name': pet.petName, 'icon': pet.petMediaIcon})
+            known = 0
+            unknown = 0
+            available = 0
+            for category_name, category_data in pets.items():
+                collected = len(category_data['collected'])
+                uncollected = len(category_data['uncollected'])
+                total = collected + uncollected
+                pets[category_name]['collected_count'] = collected
+                pets[category_name]['uncollected_count'] = uncollected
+                pets[category_name]['total_count'] = total
+                known += collected
+                unknown += uncollected
+                available += total
+
+            queryset = list(pets.items())
+            queryset.append(known)
+            queryset.append(unknown)
+            queryset.append(available)
         return response.Response(queryset)
 
 

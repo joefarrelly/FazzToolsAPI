@@ -51,6 +51,12 @@ class DataMountSerializer(serializers.HyperlinkedModelSerializer):
         fields = ('mountId', 'mountName', 'mountDescription', 'mountSource', 'mountMediaZoom', 'mountMediaIcon', 'mountFaction')
 
 
+class DataPetSerializer(serializers.HyperlinkedModelSerializer):
+    class Meta:
+        model = DataPet
+        fields = ('petId', 'petName', 'petDescription', 'petSource', 'petMediaIcon', 'petFaction')
+
+
 #################################################################################
 #                                                                               #
 #                            Data/Profile Separator                             #
@@ -68,6 +74,12 @@ class ProfileUserMountSerializer(serializers.HyperlinkedModelSerializer):
     class Meta:
         model = ProfileUserMount
         fields = ('user', 'mount')
+
+
+class ProfileUserPetSerializer(serializers.HyperlinkedModelSerializer):
+    class Meta:
+        model = ProfileUserPet
+        fields = ('user', 'pet')
 
 
 class ProfileAltSerializer(serializers.HyperlinkedModelSerializer):

@@ -1240,6 +1240,7 @@ def fullDataScan(client, secret):
         urls = [
             'https://eu.api.blizzard.com/data/wow/profession/index',
             'https://eu.api.blizzard.com/data/wow/mount/index',
+            'https://eu.api.blizzard.com/data/wow/pet/index',
         ]
         dataobj = {'access_token': token, 'namespace': 'static-eu', 'locale': 'en_US'}
         for url in urls:
@@ -1430,6 +1431,55 @@ def fullDataScan(client, secret):
                                     print(e)
                             else:
                                 print(mount_response.status_code)
+                    except KeyError as e:
+                        print(e)
+                elif 'pet' in url:
+                    try:
+                        pet_index = y.json()['pets']
+                        for pet in pet_index:
+                            print(mount['name'])
+                            pet_response = limit_call(pet['key']['href'], params=dataobj)
+                            if pet_response.status_code == 200:
+                                try:
+                                    pet_details = pet_response.json()
+                                    try:
+                                        obj_pet = DataPet.objects.get(petId=pet_details['id'])
+                                    except DataPet.DoesNotExist:
+                                        try:
+                                            media_icon = pet_details['icon']
+                                        except KeyError:
+                                            media_icon = 'https://render.worldofwarcraft.com/eu/icons/56/inv_misc_questionmark.jpg'
+                                        try:
+                                            if pet_details['is_horde_only']:
+                                                faction = 'Horde'
+                                            elif pet_details['is_alliance_only']:
+                                                faction = 'Alliance'
+                                            else:
+                                                faction = 'N/A'
+                                        except KeyError as e:
+                                            faction = 'N/A'
+                                        try:
+                                            source = pet_details['source']['name']
+                                        except KeyError as e:
+                                            source = 'N/A'
+                                        try:
+                                            description = pet_details['description']
+                                        except KeyError as e:
+                                            description = 'None'
+                                        if description is None:
+                                            description = 'None'
+                                        obj_pet = DataPet.objects.create(
+                                            petId=pet_details['id'],
+                                            petName=pet_details['name'],
+                                            petDescription=description,
+                                            petSource=source,
+                                            petMediaIcon=media_icon,
+                                            petFaction=faction
+                                        )
+                                except KeyError as e:
+                                    print(e)
+                            else:
+                                print(pet_response.status_code)
                     except KeyError as e:
                         print(e)
             else:
