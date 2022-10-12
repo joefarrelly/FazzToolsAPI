@@ -351,11 +351,14 @@ class ProfileUserMountView(viewsets.ModelViewSet):
                 known += collected
                 unknown += uncollected
                 available += total
-            mounts['known'] = known
-            mounts['unknown'] = unknown
-            mounts['available'] = available
+            # mounts['known'] = known
+            # mounts['unknown'] = unknown
+            # mounts['available'] = available
 
             queryset = list(mounts.items())
+            queryset.append(known)
+            queryset.append(unknown)
+            queryset.append(available)
         # queryset = mounts
         return response.Response(queryset)
 
