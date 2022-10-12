@@ -79,8 +79,8 @@ class DataMountView(viewsets.ModelViewSet):
 
 
 class DataPetView(viewsets.ModelViewSet):
-    serializer_class = PetMountSerializer
-    queryset = PetMount.objects.all()
+    serializer_class = DataPetSerializer
+    queryset = DataPet.objects.all()
 
 
 #################################################################################
