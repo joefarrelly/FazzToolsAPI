@@ -1001,6 +1001,7 @@ def fullAltScan(user, client, secret):
                 'https://eu.api.blizzard.com/profile/wow/character/' + realm + '/' + name + '/professions',
                 'https://eu.api.blizzard.com/profile/wow/character/' + realm + '/' + name + '/equipment',
                 'https://eu.api.blizzard.com/profile/wow/character/' + realm + '/' + name + '/collections/mounts',
+                'https://eu.api.blizzard.com/profile/wow/character/' + realm + '/' + name + '/collections/pets',
             ]
             myobj = {'access_token': token, 'namespace': 'profile-eu', 'locale': 'en_US'}
             dataobj = {'access_token': token, 'locale': 'en_US'}
@@ -1215,6 +1216,7 @@ def fullAltScan(user, client, secret):
                                     mount_obj = DataMount.objects.get(mountId=mount['mount']['id'])
                                 except DataMount.DoesNotExist:
                                     print('Mount does not exist: {} - {}'.format(mount['mount']['id'], mount['mount']['name']))
+                                    continue
                                 try:
                                     obj = ProfileUserMount.objects.get(user=user_obj, mount=mount_obj)
                                 except ProfileUserMount.DoesNotExist:
@@ -1224,6 +1226,26 @@ def fullAltScan(user, client, secret):
                                     )
                         except KeyError as e:
                             print(e)
+                    elif 'pets' in url:
+                        print('pets pending')
+                        try:
+                            data = y.json()['pets']
+                            for pet in data:
+                                try:
+                                    pet_obj = DataPet.objects.get(petId=pet['species']['id'])
+                                except DataPet.DoesNotExist:
+                                    print('Pet Does not exist: {} - {}'.format(pet['species']['id'], pet['species']['name']))
+                                    continue
+                                try:
+                                    obj = ProfileUserPet.objects.get(user=user_obj, pet=pet_obj)
+                                except ProfileUserPet.DoesNotExist:
+                                    obj = ProfileUserPet.objects.create(
+                                        user=user_obj,
+                                        pet=pet_obj
+                                    )
+                        except KeyError as e:
+                            print(e)
+
                     else:
                         print('donebutnotdone')
         except Exception as e:
