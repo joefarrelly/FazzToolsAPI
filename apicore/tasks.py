@@ -1437,7 +1437,7 @@ def fullDataScan(client, secret):
                     try:
                         pet_index = y.json()['pets']
                         for pet in pet_index:
-                            print(mount['name'])
+                            print(pet['name'])
                             pet_response = limit_call(pet['key']['href'], params=dataobj)
                             if pet_response.status_code == 200:
                                 try:
