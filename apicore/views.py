@@ -417,9 +417,9 @@ class ProfileUserPetView(viewsets.ModelViewSet):
                 unknown += uncollected
                 available += total
                 if collected == 0:
-                    pets[category_name]['collected'].append('name': 'MoWasEre', 'icon': 'placeholder')
+                    pets[category_name]['collected'].append({'name': 'MoWasEre', 'icon': 'placeholder'})
                 if uncollected == 0:
-                    pets[category_name]['uncollected'].append('name': 'MoWasEre', 'icon': 'placeholder')
+                    pets[category_name]['uncollected'].append({'name': 'MoWasEre', 'icon': 'placeholder'})
 
             queryset = list(pets.items())
             queryset.append(known)
