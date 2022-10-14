@@ -400,9 +400,9 @@ class ProfileUserPetView(viewsets.ModelViewSet):
                 except KeyError as e:
                     pets[pet.petSource]['uncollected'] = []
                 if pet.petId in collected:
-                    pets[pet.petSource]['collected'].append({'name': pet.petName, 'icon': pet.petMediaIcon})
+                    pets[pet.petSource]['collected'].append({'name': pet.petName, 'icon': pet.petMediaIcon, 'link': 'https://www.wowhead.com/npc={}'.format(pet.petNpcId)})
                 else:
-                    pets[pet.petSource]['uncollected'].append({'name': pet.petName, 'icon': pet.petMediaIcon})
+                    pets[pet.petSource]['uncollected'].append({'name': pet.petName, 'icon': pet.petMediaIcon, 'link': 'https://www.wowhead.com/npc={}'.format(pet.petNpcId)})
             known = 0
             unknown = 0
             available = 0
