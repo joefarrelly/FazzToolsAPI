@@ -54,7 +54,7 @@ class DataMountSerializer(serializers.HyperlinkedModelSerializer):
 class DataPetSerializer(serializers.HyperlinkedModelSerializer):
     class Meta:
         model = DataPet
-        fields = ('petId', 'petName', 'petDescription', 'petSource', 'petMediaIcon', 'petFaction')
+        fields = ('petId', 'petName', 'petDescription', 'petSource', 'petMediaIcon', 'petFaction', 'petNpcId')
 
 
 #################################################################################

@@ -127,6 +127,7 @@ class DataPet(models.Model):
     petSource = models.CharField(max_length=50)
     petMediaIcon = models.CharField(max_length=150)
     petFaction = models.CharField(max_length=30)
+    petNpcId = models.PositiveIntegerField()
 
     class Meta:
         db_table = 'ft_data_pet'
