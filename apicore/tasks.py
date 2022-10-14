@@ -1490,13 +1490,18 @@ def fullDataScan(client, secret):
                                             description = 'None'
                                         if description is None:
                                             description = 'None'
+                                        try:
+                                            npc_id = pet_details['creature']['id']
+                                        except KeyError as e:
+                                            npc_id = 0
                                         obj_pet = DataPet.objects.create(
                                             petId=pet_details['id'],
                                             petName=pet_details['name'],
                                             petDescription=description,
                                             petSource=source,
                                             petMediaIcon=media_icon,
-                                            petFaction=faction
+                                            petFaction=faction,
+                                            petNpcId=npc_id
                                         )
                                 except KeyError as e:
                                     print(e)
