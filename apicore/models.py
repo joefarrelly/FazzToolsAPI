@@ -188,6 +188,7 @@ class ProfileAlt(models.Model):
         MONK = 10, _('Monk')
         DRUID = 11, _('Druid')
         DEMON_HUNTER = 12, _('Demon Hunter')
+        EVOKER = 13, _('Evoker')
     altClass = models.PositiveSmallIntegerField(choices=AltClass.choices, default=AltClass.NO_CLASS)
 
     class AltRace(models.IntegerChoices):
@@ -217,6 +218,7 @@ class ProfileAlt(models.Model):
         VULPERA = 35, _('Vulpera')
         MAGHAR_ORC = 36, _('Mag\'ar Orc')
         MECHAGNOME = 37, _('Mechagnome')
+        DRACTHYR = 70, _('Dracthyr')
     altRace = models.PositiveSmallIntegerField(choices=AltRace.choices, default=AltRace.NO_RACE)
 
     altGender = models.CharField(max_length=6)
