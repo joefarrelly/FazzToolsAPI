@@ -1332,7 +1332,7 @@ def fullDataScan(client, secret):
                                                                         except KeyError as e:
                                                                             crafted_quantity = 1
                                                                         try:
-                                                                            description = recipe_details['description']
+                                                                            description = recipe_details['description'] if recipe_details['description'] else 'None'
                                                                         except KeyError as e:
                                                                             description = 'None'
                                                                         obj_recipe = DataProfessionRecipe.objects.create(
