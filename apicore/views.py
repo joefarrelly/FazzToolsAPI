@@ -664,13 +664,12 @@ class DataScan(viewsets.ViewSet):
 
 line_data_regex = re.compile(r'^\s*(.*?),?(?: -- \[\d+\])?$')
 key_value_regex = re.compile(r'^\[(.*?)\] = (.*?)?$')
-index_count = 0
+index_count = -1
 
 def recursive():
     global index_count
     s_type = 'list'
     result = []
-    print(index_count)
     while index_count < len(all_lines):
         index_count = index_count + 1
         line_data = re.search(line_data_regex, all_lines[index_count])
