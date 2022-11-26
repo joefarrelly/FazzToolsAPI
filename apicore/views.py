@@ -169,6 +169,7 @@ class ProfileUserView(viewsets.ModelViewSet):
                 temp.file.close()
                 index_count = 0
                 temp4 = recursive()
+                index_count = 0
                 temp7 = json.loads(temp4[1])
                 # print(temp6)
                 # print(temp7)
