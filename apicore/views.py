@@ -240,7 +240,7 @@ class ProfileUserView(viewsets.ModelViewSet):
                                     except:
                                         pass
                     alt = request.query_params.get('alt').title()
-                    realm = request.query_params.get('realm').title()
+                    realm = string.capwords(request.query_params.get('realm'))
                     spec = request.query_params.get('spec').title()
                     altFull = alt + '-' + realm
                     alt_config = temp7['alts'][altFull]
