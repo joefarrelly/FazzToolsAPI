@@ -701,8 +701,10 @@ def recursive():
                 break
             result.append('{}:{}'.format(key_single, value_single))
         else:
-            if 'nil' in line_single:
-                line_single = line_single.replace('nil', '""')
+            nil_index = line_single.find('nil')
+            if nil_index != -1:
+                if line_single[nil_index - 1] != '"':
+                    line_single = line_single.replace('nil', '""')
             result.append(line_single)
     if s_type == 'list':
         return (s_type, '[{}]'.format(','.join(result)))
