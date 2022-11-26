@@ -197,10 +197,10 @@ class ProfileUserView(viewsets.ModelViewSet):
                             print(alt_specs)
                     result.sort(key=lambda x: (x[1], x[0]))
                 elif request.query_params.get('page') == 'single':
-                    alt = request.query_params.get('alt').title()
-                    realm = request.query_params.get('realm').title()
-                    spec = request.query_params.get('spec').title()
-                    altFull = alt + '-' + realm.replace('\'', '').replace('-', '')
+                    alt = request.query_params.get('alt').capwords()
+                    realm = request.query_params.get('realm').capwords()
+                    spec = request.query_params.get('spec').capwords()
+                    altFull = alt + '-' + realm
                     alt_config = temp7['alts'][altFull]
                     keybind_map = getKeybindMap(alt_config['kbConfig']['addon'])
                     user_keybind = {}
