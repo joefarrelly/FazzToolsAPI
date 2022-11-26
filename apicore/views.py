@@ -186,10 +186,13 @@ class ProfileUserView(viewsets.ModelViewSet):
                         while len(specs) < 4:
                             specs.append('---')
                         alt_specs = alt.split('-')
-                        alt_obj = ProfileAlt.objects.get(altName=alt_specs[0], altRealm=alt_specs[1])
-                        alt_specs.append(alt_obj.get_altClass_display())
-                        alt_specs.extend(specs)
-                        result.append(alt_specs)
+                        try:
+                            alt_obj = ProfileAlt.objects.get(altName=alt_specs[0], altRealm=alt_specs[1])
+                            alt_specs.append(alt_obj.get_altClass_display())
+                            alt_specs.extend(specs)
+                            result.append(alt_specs)
+                        except ProfileAlt.DoesNotExist:
+                            print(alt_specs)
                     result.sort(key=lambda x: (x[1], x[0]))
                 elif request.query_params.get('page') == 'single':
                     alt = request.query_params.get('alt').title()
