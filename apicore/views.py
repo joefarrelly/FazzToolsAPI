@@ -167,6 +167,7 @@ class ProfileUserView(viewsets.ModelViewSet):
                 # print(repr(temp3))
                 all_lines = [line.decode('utf-8') for line in temp3]
                 temp.file.close()
+                index_count = 0
                 temp4 = recursive()
                 temp7 = json.loads(temp4[1])
                 # print(temp6)
