@@ -215,7 +215,7 @@ class ProfileUserView(viewsets.ModelViewSet):
                             found = False
                             for thing in alt_config['spell'][spec]:
                                 for name_spell in alt_config['spell'][spec][thing]:
-                                    if alt_config['spell'][spec][thing][name_spell][1] in alt_config['macro'][nice_spell.split(':')[1]][3]:
+                                    if alt_config['spell'][spec][thing][name_spell][0] in alt_config['macro'][nice_spell.split(':')[1]][2]:
                                         found = True
                                         if not user_keybind.get('spell:' + str(name_spell)):
                                             try:
