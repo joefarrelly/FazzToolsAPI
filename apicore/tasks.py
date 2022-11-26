@@ -1284,7 +1284,7 @@ def fullDataScan(client, secret):
                                         obj_profession = DataProfession.objects.create(
                                             professionId=profession_details['id'],
                                             professionName=profession_details['name'],
-                                            professionDescription=profession_details['description']
+                                            professionDescription=profession_details['description'] if profession_details['description'] else ''
                                         )
                                 except KeyError as e:
                                     print(e)
