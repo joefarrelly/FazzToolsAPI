@@ -252,7 +252,7 @@ class ProfileUserView(viewsets.ModelViewSet):
                         for spell in alt_config['spell'][spec][tab]:
                             if alt_config['spell'][spec][tab][spell][1] in spam_filter:
                                 continue
-                            list_spell_single = [spell]
+                            list_spell_single = [alt_config['spell'][spec][tab][spell][1]]
                             for stat in alt_config['spell'][spec][tab][spell]:
                                 if stat == 1:
                                     list_spell_single.append(alt_config['spell'][spec][tab][spell][stat])
