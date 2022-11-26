@@ -174,10 +174,13 @@ class ProfileUserView(viewsets.ModelViewSet):
                 if request.query_params.get('page') == 'all':
                     for alt in temp7['alts']:
                         specs = []
-                        if temp7['alts'][alt]['kb'] is not None:
-                            for spec in temp7['alts'][alt]['kb']:
-                                specs.append(spec)
-                        else:
+                        try:
+                            if temp7['alts'][alt]['kb'] is not None:
+                                for spec in temp7['alts'][alt]['kb']:
+                                    specs.append(spec)
+                            else:
+                                specs = ['---', '---', '---', '---']
+                        except KeyError:
                             specs = ['---', '---', '---', '---']
                         specs.sort()
                         while len(specs) < 4:
