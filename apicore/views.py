@@ -140,6 +140,7 @@ class ProfileUserView(viewsets.ModelViewSet):
             print("Invalid 3")
 
     def list(self, request):
+        global all_lines
         user = request.query_params.get('user')
         queryset = ProfileUser.objects.all()
         if user is None:
@@ -162,36 +163,10 @@ class ProfileUserView(viewsets.ModelViewSet):
                 temp3 = temp2.readlines()
                 # temp6 = temp3.decode('utf-8')
                 # print(repr(temp3))
-                tempresult = ''
-                for line in temp3:
-                    line = line.decode('utf-8')
-                    # line2 = re.sub(r'(\r\n|\r|\n)(?=(?:[^"]*"[^"]*")*[^"]*$)', '\n', line)
-                    tempresult += re.sub(r'(^\s+)(.+)--\s(\[\d+\]$)', r'\1\3 = \2', line)
+                all_lines = temp3
                 temp.file.close()
-                # print(tempresult)
-                # temp6 = result
-                # print(temp6)
-                # temp6 = temp6.replace('-- [1]', '')
-                # temp6 = temp6.replace('-- [2]', '')
-                # temp6 = temp6.replace('-- [3]', '')
-                # temp6 = temp6.replace('-- [4]', '')
-                # temp6 = temp6.replace('[', '')
-                # temp6 = tempresult.replace('[', '')
-                temp6 = re.sub(r'\[(?=(?:[^"]*"[^"]*")*[^"]*$)', '', tempresult)
-                # temp16 = re.sub(r'\](?=(?:[^"]*"[^"]*")*[^"]*$)', '', temp6)
-                # temp26 = re.sub(r'\=(?=(?:[^"]*"[^"]*")*[^"]*$)', ':', temp16)
-                # print(temp6)
-                # temp6 = temp26
-                # temp6 = temp6.replace(']', '')
-                # temp6 = temp6.replace('=', ':')
-                temp6 = temp6.replace('] =', ' :')
-                temp6 = temp6.replace('FazzToolsScraperDB =', '')
-                # temp6 = temp6[22:].strip()
-                temp6 = temp6.strip()
-                temp6 = temp6.replace('\n', '')
-                temp6 = temp6.replace('\t', '')
-                temp6 = temp6.replace('{}', 'None')
-                temp7 = ast.literal_eval(temp6)
+                temp4 = recursive()
+                temp7 = temp4[1]
                 # print(temp6)
                 # print(temp7)
                 if request.query_params.get('page') == 'all':
@@ -685,6 +660,51 @@ class DataScan(viewsets.ViewSet):
             return response.Response('Passowrd Correct')
         else:
             return response.Response('Incorrect Password')
+
+
+line_data_regex = re.compile(r'^\s*(.*?),?(?: -- \[\d+\])?$')
+key_value_regex = re.compile(r'^\[(.*?)\] = (.*?)?$')
+index_count = 0
+
+def recursive():
+    global index_count
+    s_type = 'list'
+    result = []
+    print(index_count)
+    while index_count < len(all_lines):
+        index_count = index_count + 1
+        line_data = re.search(line_data_regex, all_lines[index_count])
+        if not line_data:
+            sys.exit('bad input on some line')
+        line_single = line_data.group(1)
+        if line_single == '{':
+            return_text = recursive()
+            if return_text[1] != '[]':
+                result.append(return_text[1])
+            continue
+        if line_single == '}':
+            break
+        key_value_data = re.search(key_value_regex, line_single)
+        if key_value_data:
+            s_type = 'dict'
+            key_single = key_value_data.group(1)
+            value_single = key_value_data.group(2)
+            if key_single[0] != '"':
+                key_single = '"{}"'.format(key_single)
+            if value_single == '{':
+                return_text = recursive()
+                if return_text[1] != '[]':
+                    result.append('{}:{}'.format(key_single, return_text[1]))
+                continue
+            if value_single == '}':
+                break
+            result.append('{}:{}'.format(key_single, value_single))
+        else:
+            result.append(line_single)
+    if s_type == 'list':
+        return (s_type, '[{}]'.format(','.join(result)))
+    else:
+        return (s_type, '{{{}}}'.format(','.join(result)))
 
 
 ##########################################################################################
