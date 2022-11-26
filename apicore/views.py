@@ -200,7 +200,7 @@ class ProfileUserView(viewsets.ModelViewSet):
                     result.sort(key=lambda x: (x[1], x[0]))
                 elif request.query_params.get('page') == 'single':
                     alt = string.capwords(request.query_params.get('alt'))
-                    realm = string.capwords(request.query_params.get('realm'), sep=' ')
+                    realm = string.capwords(request.query_params.get('realm').decode('utf-8'))
                     spec = string.capwords(request.query_params.get('spec'))
                     altFull = alt + '-' + realm
                     alt_config = temp7['alts'][altFull]
