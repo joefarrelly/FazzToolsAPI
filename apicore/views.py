@@ -255,7 +255,7 @@ class ProfileUserView(viewsets.ModelViewSet):
                             list_spell_single = []
                             for stat in alt_config['spell'][spec][tab][spell]:
                                 if stat == 1:
-                                    list_spell_single.append(alt_config['spell'][spec][tab][spell][stat])
+                                    list_spell_single.append(str(alt_config['spell'][spec][tab][spell][stat]))
                             try:
                                 list_spell_single.append(user_keybind['spell:' + str(spell)])
                             except:
