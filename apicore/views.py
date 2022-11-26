@@ -200,7 +200,7 @@ class ProfileUserView(viewsets.ModelViewSet):
                     alt = request.query_params.get('alt').title()
                     realm = request.query_params.get('realm').title()
                     spec = request.query_params.get('spec').title()
-                    altFull = alt + '-' + realm
+                    altFull = alt + '-' + realm.replace('\'', '').replace('-', '')
                     alt_config = temp7['alts'][altFull]
                     keybind_map = getKeybindMap(alt_config['kbConfig']['addon'])
                     user_keybind = {}
