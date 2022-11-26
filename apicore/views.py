@@ -159,7 +159,7 @@ class ProfileUserView(viewsets.ModelViewSet):
             if queryset[0].userFile:
                 temp = queryset[0].userFile
                 with open(temp.file, 'r') as file:
-                    all_lines = [line for line in file]
+                    all_lines = [line.decode('utf-8') for line in file]
                 # temp6 = temp3.decode('utf-8')
                 temp4 = recursive()
                 temp7 = temp4[1]
