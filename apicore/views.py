@@ -166,7 +166,7 @@ class ProfileUserView(viewsets.ModelViewSet):
                 all_lines = [line.decode('utf-8') for line in temp3]
                 temp.file.close()
                 temp4 = recursive()
-                temp7 = temp4[1]
+                temp7 = json.loads(temp4[1])
                 # print(temp6)
                 # print(temp7)
                 if request.query_params.get('page') == 'all':
