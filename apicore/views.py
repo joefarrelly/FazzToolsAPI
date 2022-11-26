@@ -250,12 +250,12 @@ class ProfileUserView(viewsets.ModelViewSet):
                     for tab in alt_config['spell'][spec]:
                         list_spells = []
                         for spell in alt_config['spell'][spec][tab]:
-                            if alt_config['spell'][spec][tab][spell][1] in spam_filter:
+                            if alt_config['spell'][spec][tab][spell][0] in spam_filter:
                                 continue
                             list_spell_single = []
                             for stat in alt_config['spell'][spec][tab][spell]:
                                 if stat == 1:
-                                    list_spell_single.append(str(alt_config['spell'][spec][tab][spell][stat]))
+                                    list_spell_single.append(alt_config['spell'][spec][tab][spell][stat])
                             try:
                                 list_spell_single.append(user_keybind['spell:' + str(spell)])
                             except:
@@ -266,10 +266,10 @@ class ProfileUserView(viewsets.ModelViewSet):
                     list_spells = []
                     for item in alt_config['item']:
                         if user_keybind.get('item:' + str(item)):
-                            list_spells.append([alt_config['item'][item][1], user_keybind['item:' + str(item)]])
+                            list_spells.append([alt_config['item'][item][0], user_keybind['item:' + str(item)]])
                     for macro in alt_config['macro']:
                         if user_keybind.get('macro:' + str(macro)):
-                            list_spells.append(['[Macro] {}'.format(alt_config['macro'][macro][1]), user_keybind['macro:' + str(macro)]])
+                            list_spells.append(['[Macro] {}'.format(alt_config['macro'][macro][0]), user_keybind['macro:' + str(macro)]])
                     list_spells = sorted(list_spells, key=lambda x: x[0])
                     full_result.append(['Misc', list_spells])
                     result = sorted(full_result, key=lambda x: SPELLS_ORDER[x[0]])
