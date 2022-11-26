@@ -143,6 +143,7 @@ class ProfileUserView(viewsets.ModelViewSet):
 
     def list(self, request):
         global all_lines
+        global index_count
         user = request.query_params.get('user')
         queryset = ProfileUser.objects.all()
         if user is None:
@@ -169,7 +170,6 @@ class ProfileUserView(viewsets.ModelViewSet):
                 temp.file.close()
                 index_count = 0
                 temp4 = recursive()
-                index_count = 0
                 temp7 = json.loads(temp4[1])
                 # print(temp6)
                 # print(temp7)
