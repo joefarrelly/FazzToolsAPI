@@ -6,8 +6,8 @@ from django.utils.translation import gettext_lazy as _
 
 class DataProfession(models.Model):
     professionId = models.PositiveIntegerField(primary_key=True)
-    professionName = models.CharField(max_length=50)
-    professionDescription = models.CharField(max_length=300)
+    professionName = models.CharField(max_length=128)
+    professionDescription = models.CharField(max_length=1024)
 
     class Meta:
         db_table = 'ft_data_profession'
@@ -19,7 +19,7 @@ class DataProfession(models.Model):
 class DataProfessionTier(models.Model):
     profession = models.ForeignKey(DataProfession, on_delete=models.CASCADE)
     tierId = models.PositiveSmallIntegerField(primary_key=True)
-    tierName = models.CharField(max_length=100)
+    tierName = models.CharField(max_length=128)
     tierMinSkill = models.PositiveSmallIntegerField()
     tierMaxSkill = models.PositiveSmallIntegerField()
 
@@ -33,9 +33,9 @@ class DataProfessionTier(models.Model):
 class DataProfessionRecipe(models.Model):
     tier = models.ForeignKey(DataProfessionTier, on_delete=models.CASCADE)
     recipeId = models.PositiveSmallIntegerField(primary_key=True)
-    recipeName = models.CharField(max_length=100)
-    recipeDescription = models.CharField(max_length=500)
-    recipeCategory = models.CharField(max_length=100)
+    recipeName = models.CharField(max_length=128)
+    recipeDescription = models.CharField(max_length=1024)
+    recipeCategory = models.CharField(max_length=128)
     recipeRank = models.PositiveSmallIntegerField()
     recipeCraftedQuantity = models.PositiveIntegerField()
 
@@ -48,9 +48,9 @@ class DataProfessionRecipe(models.Model):
 
 class DataReagent(models.Model):
     reagentId = models.PositiveIntegerField(primary_key=True)
-    reagentName = models.CharField(max_length=100)
-    reagentQuality = models.CharField(max_length=20)
-    reagentMedia = models.CharField(max_length=150)
+    reagentName = models.CharField(max_length=128)
+    reagentQuality = models.CharField(max_length=32)
+    reagentMedia = models.CharField(max_length=256)
 
     class Meta:
         db_table = 'ft_data_reagent'
@@ -73,10 +73,10 @@ class DataRecipeReagent(models.Model):
 
 class DataEquipment(models.Model):
     equipmentId = models.PositiveIntegerField(primary_key=True)
-    equipmentName = models.CharField(max_length=80)
-    equipmentType = models.CharField(max_length=20)
-    equipmentSlot = models.CharField(max_length=20)
-    equipmentIcon = models.CharField(max_length=100)
+    equipmentName = models.CharField(max_length=128)
+    equipmentType = models.CharField(max_length=32)
+    equipmentSlot = models.CharField(max_length=32)
+    equipmentIcon = models.CharField(max_length=128)
 
     class Meta:
         db_table = 'ft_data_equipment'
@@ -98,7 +98,7 @@ class DataEquipmentVariant(models.Model):
     vers = models.PositiveSmallIntegerField()
     crit = models.PositiveSmallIntegerField()
     level = models.PositiveSmallIntegerField()
-    quality = models.CharField(max_length=20)
+    quality = models.CharField(max_length=32)
 
     class Meta:
         db_table = 'ft_data_equipmentvariant'
@@ -109,12 +109,12 @@ class DataEquipmentVariant(models.Model):
 
 class DataMount(models.Model):
     mountId = models.PositiveIntegerField(primary_key=True)
-    mountName = models.CharField(max_length=100)
-    mountDescription = models.CharField(max_length=500)
-    mountSource = models.CharField(max_length=50)
-    mountMediaZoom = models.CharField(max_length=150)
-    mountMediaIcon = models.CharField(max_length=150)
-    mountFaction = models.CharField(max_length=30)
+    mountName = models.CharField(max_length=128)
+    mountDescription = models.CharField(max_length=1024)
+    mountSource = models.CharField(max_length=64)
+    mountMediaZoom = models.CharField(max_length=256)
+    mountMediaIcon = models.CharField(max_length=256)
+    mountFaction = models.CharField(max_length=64)
 
     class Meta:
         db_table = 'ft_data_mount'
@@ -122,11 +122,11 @@ class DataMount(models.Model):
 
 class DataPet(models.Model):
     petId = models.PositiveIntegerField(primary_key=True)
-    petName = models.CharField(max_length=100)
-    petDescription = models.CharField(max_length=500)
-    petSource = models.CharField(max_length=50)
-    petMediaIcon = models.CharField(max_length=150)
-    petFaction = models.CharField(max_length=30)
+    petName = models.CharField(max_length=128)
+    petDescription = models.CharField(max_length=1024)
+    petSource = models.CharField(max_length=64)
+    petMediaIcon = models.CharField(max_length=256)
+    petFaction = models.CharField(max_length=64)
     petNpcId = models.PositiveIntegerField()
 
     class Meta:
@@ -169,10 +169,10 @@ class ProfileAlt(models.Model):
     altId = models.PositiveIntegerField(primary_key=True)
     altAccountId = models.PositiveIntegerField()
     altLevel = models.PositiveSmallIntegerField()
-    altName = models.CharField(max_length=40)
-    altRealm = models.CharField(max_length=40)
+    altName = models.CharField(max_length=64)
+    altRealm = models.CharField(max_length=64)
     altRealmId = models.PositiveSmallIntegerField()
-    altRealmSlug = models.CharField(max_length=40)
+    altRealmSlug = models.CharField(max_length=64)
 
     class AltClass(models.IntegerChoices):
         NO_CLASS = 0, _('No Class')
@@ -221,8 +221,8 @@ class ProfileAlt(models.Model):
         DRACTHYR = 70, _('Dracthyr')
     altRace = models.PositiveSmallIntegerField(choices=AltRace.choices, default=AltRace.NO_RACE)
 
-    altGender = models.CharField(max_length=6)
-    altFaction = models.CharField(max_length=10)
+    altGender = models.CharField(max_length=16)
+    altFaction = models.CharField(max_length=16)
     altExpiryDate = models.DateTimeField()
 
     user = models.ForeignKey(ProfileUser, on_delete=models.CASCADE)
