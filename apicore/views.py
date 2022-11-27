@@ -535,44 +535,91 @@ class ProfileAltEquipmentView(viewsets.ModelViewSet):
     queryset = ProfileAltEquipment.objects.all()
 
     def list(self, request):
-        user = request.query_params.get('user')
-        fields = request.query_params.getlist('fields[]')
-        queryset = ProfileAlt.objects.filter(user=user).values_list('altId', flat=True)
-        extra_queryset = DataEquipmentVariant.objects.all()
-        if user is None:
-            queryset = {}
-        else:
-            queryset = ProfileAltEquipment.objects.filter(alt__in=queryset).select_related('alt').order_by('-alt__altLevel')
-        if not fields or fields[0] == '':
-            fields = ['.altName', '.altRealm', '.get_altClass_display', 'head', 'neck', 'shoulder', 'back', 'chest', 'tabard', 'shirt', 'wrist', 'hands', 'belt', 'legs', 'feet', 'ring1', 'ring2', 'trinket1', 'trinket2', 'weapon1', 'weapon2']
-        alts = []
-        for alt in queryset:
-            avg_level = []
-            temp = []
-            for field in fields:
-                if '.' in field:
-                    if '_' in field:
-                        temp.append(getattr(alt.alt, field[1:])())
+        if request.query_params.get('page') == 'all':
+            user = request.query_params.get('user')
+            fields = request.query_params.getlist('fields[]')
+            queryset = ProfileAlt.objects.filter(user=user).values_list('altId', flat=True)
+            extra_queryset = DataEquipmentVariant.objects.all()
+            if user is None:
+                queryset = {}
+            else:
+                queryset = ProfileAltEquipment.objects.filter(alt__in=queryset).select_related('alt').order_by('-alt__altLevel')
+            if not fields or fields[0] == '':
+                fields = ['.altName', '.altRealm', '.get_altClass_display', 'head', 'neck', 'shoulder', 'back', 'chest', 'tabard', 'shirt', 'wrist', 'hands', 'belt', 'legs', 'feet', 'ring1', 'ring2', 'trinket1', 'trinket2', 'weapon1', 'weapon2']
+            alts = []
+            for alt in queryset:
+                avg_level = []
+                temp = []
+                for field in fields:
+                    if '.' in field:
+                        if '_' in field:
+                            temp.append(getattr(alt.alt, field[1:])())
+                        else:
+                            temp.append(getattr(alt.alt, field[1:]))
                     else:
-                        temp.append(getattr(alt.alt, field[1:]))
-                else:
-                    if getattr(alt, field) != '0':
-                        equipment, variant = getattr(alt, field).split(':')
-                        temp3 = extra_queryset.filter(equipment=equipment, variant=variant)
-                        temp.append(temp3[0].level)
-                        if field != 'tabard' and field != 'shirt':
-                            avg_level.append(temp3[0].level)
-                    else:
-                        temp.append(getattr(alt, field))
-                        if field != 'tabard' and field != 'shirt':
-                            avg_level.append(0)
-            if avg_level[-1] == 0:
-                avg_level.pop()
-                avg_level.append(avg_level[-1])
-            avg_level = sum(avg_level) / 16
-            temp.insert(3, '{0:.2f}'.format(avg_level))
-            alts.append(temp)
-        return response.Response(sorted(alts, key=lambda x: float(x[3]), reverse=True))
+                        if getattr(alt, field) != '0':
+                            equipment, variant = getattr(alt, field).split(':')
+                            temp3 = extra_queryset.filter(equipment=equipment, variant=variant)
+                            temp.append(temp3[0].level)
+                            if field != 'tabard' and field != 'shirt':
+                                avg_level.append(temp3[0].level)
+                        else:
+                            temp.append(getattr(alt, field))
+                            if field != 'tabard' and field != 'shirt':
+                                avg_level.append(0)
+                if avg_level[-1] == 0:
+                    avg_level.pop()
+                    avg_level.append(avg_level[-1])
+                avg_level = sum(avg_level) / 16
+                temp.insert(3, '{0:.2f}'.format(avg_level))
+                alts.append(temp)
+            return response.Response(sorted(alts, key=lambda x: float(x[3]), reverse=True))
+        elif request.query_params.get('page') == 'single':
+            alt = ProfileAlt.objects.filter(altName=request.query_params.get('alt').title(), altRealmSlug=request.query_params.get('realm'))[:1]
+            fields = request.query_params.getlist('fields[]')
+            # queryset = ProfileAlt.objects.filter(user=user).values_list('altId', flat=True)
+            # extra_queryset = DataEquipmentVariant.objects.all()
+
+            queryset = ProfileAltEquipment.objects.filter(alt=alt)
+            return response.Response(queryset)
+            
+            # profession = DataProfession.objects.filter(professionName=request.query_params.get('profession').title())[:1]
+            # queryset = ProfileAltProfessionData.objects.select_related('profession', 'professionTier', 'professionRecipe').all()
+            # queryset = queryset.filter(alt=alt[0].altId, profession=profession[0].professionId)
+            # if user is None:
+            #     queryset = {}
+            # else:
+            #     queryset = ProfileAltEquipment.objects.filter(alt__in=queryset).select_related('alt').order_by('-alt__altLevel')
+            # if not fields or fields[0] == '':
+            #     fields = ['.altName', '.altRealm', '.get_altClass_display', 'head', 'neck', 'shoulder', 'back', 'chest', 'tabard', 'shirt', 'wrist', 'hands', 'belt', 'legs', 'feet', 'ring1', 'ring2', 'trinket1', 'trinket2', 'weapon1', 'weapon2']
+            # alts = []
+            # for alt in queryset:
+            #     avg_level = []
+            #     temp = []
+            #     for field in fields:
+            #         if '.' in field:
+            #             if '_' in field:
+            #                 temp.append(getattr(alt.alt, field[1:])())
+            #             else:
+            #                 temp.append(getattr(alt.alt, field[1:]))
+            #         else:
+            #             if getattr(alt, field) != '0':
+            #                 equipment, variant = getattr(alt, field).split(':')
+            #                 temp3 = extra_queryset.filter(equipment=equipment, variant=variant)
+            #                 temp.append(temp3[0].level)
+            #                 if field != 'tabard' and field != 'shirt':
+            #                     avg_level.append(temp3[0].level)
+            #             else:
+            #                 temp.append(getattr(alt, field))
+            #                 if field != 'tabard' and field != 'shirt':
+            #                     avg_level.append(0)
+            #     if avg_level[-1] == 0:
+            #         avg_level.pop()
+            #         avg_level.append(avg_level[-1])
+            #     avg_level = sum(avg_level) / 16
+            #     temp.insert(3, '{0:.2f}'.format(avg_level))
+            #     alts.append(temp)
+            # return response.Response(sorted(alts, key=lambda x: float(x[3]), reverse=True))
 
 
 class BnetLogin(viewsets.ViewSet):
