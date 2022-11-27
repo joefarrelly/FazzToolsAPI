@@ -218,7 +218,8 @@ class ProfileAlt(models.Model):
         VULPERA = 35, _('Vulpera')
         MAGHAR_ORC = 36, _('Mag\'ar Orc')
         MECHAGNOME = 37, _('Mechagnome')
-        DRACTHYR = 70, _('Dracthyr')
+        DRACTHYR_ALLIANCE = 52, _('Dracthyr')
+        DRACTHYR_HORDE = 70, _('Dracthyr')
     altRace = models.PositiveSmallIntegerField(choices=AltRace.choices, default=AltRace.NO_RACE)
 
     altGender = models.CharField(max_length=16)
