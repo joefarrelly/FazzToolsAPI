@@ -226,9 +226,6 @@ class ProfileAlt(models.Model):
     altFaction = models.CharField(max_length=16)
     altExpiryDate = models.DateTimeField()
 
-    altLocation = models.CharField(max_length=256)
-    altGold = models.PositiveIntegerField()
-
     user = models.ForeignKey(ProfileUser, on_delete=models.CASCADE)
 
     class Meta:
