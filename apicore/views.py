@@ -583,7 +583,7 @@ class ProfileAltEquipmentView(viewsets.ModelViewSet):
             queryset = ProfileAltEquipment.objects.get(alt=alt)
             result = []
 
-            result = [queryset.alt, queryset.head, queryset.neck, queryset.shoulder, queryset.back, queryset.chest, queryset.tabard, queryset.shirt, queryset.wrist, queryset.hands, queryset.belt, queryset.legs, queryset.feet, queryset.ring1, queryset.ring2, queryset.trinket1, queryset.trinket2, queryset.weapon1, queryset.weapon2, queryset.altEquipmentExpiryDate]
+            result = [queryset.head, queryset.neck, queryset.shoulder, queryset.back, queryset.chest, queryset.tabard, queryset.shirt, queryset.wrist, queryset.hands, queryset.belt, queryset.legs, queryset.feet, queryset.ring1, queryset.ring2, queryset.trinket1, queryset.trinket2, queryset.weapon1, queryset.weapon2, queryset.altEquipmentExpiryDate]
             
             return response.Response(result)
             
