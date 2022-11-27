@@ -588,7 +588,7 @@ class ProfileAltEquipmentView(viewsets.ModelViewSet):
                 if len(slot.split(':')) == 2:
                     equipment, variant = slot.split(':')
                     equipment_obj = DataEquipment.objects.get(equipmentId=equipment)
-                    variant_obj = DataEquipmentVariant.objects.get(variant=variant)
+                    variant_obj = DataEquipmentVariant.objects.get(variant=variant, equipment=equipment_obj)
                     full_result.append([equipment_obj.equipmentName, variant_obj.level])
                 else:
                     full_result.append(['None', '0'])
