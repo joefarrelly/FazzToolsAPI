@@ -581,11 +581,19 @@ class ProfileAltEquipmentView(viewsets.ModelViewSet):
             # extra_queryset = DataEquipmentVariant.objects.all()
 
             queryset = ProfileAltEquipment.objects.get(alt=alt)
-            result = []
-
-            result = [queryset.head, queryset.neck, queryset.shoulder, queryset.back, queryset.chest, queryset.tabard, queryset.shirt, queryset.wrist, queryset.hands, queryset.belt, queryset.legs, queryset.feet, queryset.ring1, queryset.ring2, queryset.trinket1, queryset.trinket2, queryset.weapon1, queryset.weapon2, queryset.altEquipmentExpiryDate]
             
-            return response.Response(result)
+            all_gear = [queryset.head, queryset.neck, queryset.shoulder, queryset.back, queryset.chest, queryset.tabard, queryset.shirt, queryset.wrist, queryset.hands, queryset.belt, queryset.legs, queryset.feet, queryset.ring1, queryset.ring2, queryset.trinket1, queryset.trinket2, queryset.weapon1, queryset.weapon2]
+            full_result = []
+            for slot in all_gear:
+                if len(slot.split(':')) == 2:
+                    equipment, variant = slot.split(':')
+                    equipment_obj = DataEquipment.objects.get(equipmentId=equipment)
+                    variant_obj = DataEquipmentVariant.objects.get(variant=variant)
+                    full_result.append([equipment_obj.equipmentName, variant_obj.level])
+                else:
+                    full_result.append('None', '0')
+            
+            return response.Response(full_result)
             
             # profession = DataProfession.objects.filter(professionName=request.query_params.get('profession').title())[:1]
             # queryset = ProfileAltProfessionData.objects.select_related('profession', 'professionTier', 'professionRecipe').all()
