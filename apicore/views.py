@@ -581,7 +581,10 @@ class ProfileAltEquipmentView(viewsets.ModelViewSet):
             # extra_queryset = DataEquipmentVariant.objects.all()
 
             queryset = ProfileAltEquipment.objects.filter(alt=alt)
-            return response.Response(queryset)
+            result = []
+            for item in queryset:
+                result.append(item)
+            return response.Response(result)
             
             # profession = DataProfession.objects.filter(professionName=request.query_params.get('profession').title())[:1]
             # queryset = ProfileAltProfessionData.objects.select_related('profession', 'professionTier', 'professionRecipe').all()
