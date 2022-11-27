@@ -580,10 +580,11 @@ class ProfileAltEquipmentView(viewsets.ModelViewSet):
             # queryset = ProfileAlt.objects.filter(user=user).values_list('altId', flat=True)
             # extra_queryset = DataEquipmentVariant.objects.all()
 
-            queryset = ProfileAltEquipment.objects.filter(alt=alt)
+            queryset = ProfileAltEquipment.objects.get(alt=alt)
             result = []
-            for item in queryset:
-                result.append(item)
+
+            result = [queryset.alt, queryset.head, queryset.neck, queryset.shoulder, queryset.back, queryset.chest, queryset.tabard, queryset.shirt, queryset.wrist, queryset.hands, queryset.belt, queryset.legs, queryset.feet, queryset.ring1, queryset.ring2, queryset.trinket1, queryset.trinket2, queryset.weapon1, queryset.weapon2, queryset.altEquipmentExpiryDate]
+            
             return response.Response(result)
             
             # profession = DataProfession.objects.filter(professionName=request.query_params.get('profession').title())[:1]
