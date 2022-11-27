@@ -591,7 +591,7 @@ class ProfileAltEquipmentView(viewsets.ModelViewSet):
                     variant_obj = DataEquipmentVariant.objects.get(variant=variant)
                     full_result.append([equipment_obj.equipmentName, variant_obj.level])
                 else:
-                    full_result.append('None', '0')
+                    full_result.append(['None', '0'])
             
             return response.Response(full_result)
             
