@@ -1510,7 +1510,7 @@ def fullDataScan(client, secret):
                     except KeyError as e:
                         print(e)
             else:
-                print(y.status_code)
+                print(f"{y.status_code}: {url}")
     except KeyError as e:
         print(e)
     return('Done Long Task')
