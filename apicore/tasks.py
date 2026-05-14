@@ -956,9 +956,9 @@ retries = Retry(total=3, backoff_factor=1)
 p.mount('https://', HTTPAdapter(max_retries=retries))
 
 
-def limit_call(url, params):
+def limit_call(url, params, headers=None):
     try:
-        response = p.get(url, params=params, timeout=5)
+        response = p.get(url, params=params, headers=headers, timeout=5)
         return response
     except requests.exceptions.RequestException as e:
         temp_response = {'status_code': 999}
@@ -1003,10 +1003,11 @@ def fullAltScan(user, client, secret):
                 'https://eu.api.blizzard.com/profile/wow/character/' + realm + '/' + name + '/collections/mounts',
                 'https://eu.api.blizzard.com/profile/wow/character/' + realm + '/' + name + '/collections/pets',
             ]
-            myobj = {'access_token': token, 'namespace': 'profile-eu', 'locale': 'en_US'}
-            dataobj = {'access_token': token, 'locale': 'en_US'}
+            auth_headers = {'Authorization': f'Bearer {token}'}
+            myobj = {'namespace': 'profile-eu', 'locale': 'en_US'}
+            dataobj = {'locale': 'en_US'}
             for url in urls:
-                y = p.get(url, params=myobj, timeout=5)
+                y = p.get(url, params=myobj, headers=auth_headers, timeout=5)
                 counter += 1
                 if y.status_code == 200:
                     if 'professions' in url:
@@ -1041,7 +1042,7 @@ def fullAltScan(user, client, secret):
                                             except DataProfessionRecipe.DoesNotExist:
                                                 print('Does not exist: {}'.format(recipe['name']))
 
-                                                recipe_response = limit_call(recipe['key']['href'], params=dataobj)
+                                                recipe_response = limit_call(recipe['key']['href'], params=dataobj, headers=auth_headers)
                                                 counter += 1
                                                 if recipe_response.status_code == 200:
                                                     try:
@@ -1264,9 +1265,10 @@ def fullDataScan(client, secret):
             'https://eu.api.blizzard.com/data/wow/mount/index',
             'https://eu.api.blizzard.com/data/wow/pet/index',
         ]
-        dataobj = {'access_token': token, 'namespace': 'static-eu', 'locale': 'en_US'}
+        auth_headers = {'Authorization': f'Bearer {token}'}
+        dataobj = {'namespace': 'static-eu', 'locale': 'en_US'}
         for url in urls:
-            y = limit_call(url, params=dataobj)
+            y = limit_call(url, params=dataobj, headers=auth_headers)
             if y.status_code == 200:
                 if 'profession' in url:
                     try:
@@ -1274,7 +1276,7 @@ def fullDataScan(client, secret):
                         for profession in profession_index:
                             # if profession['name'] != 'Mining':
                             #     continue
-                            profession_response = limit_call(profession['key']['href'], params=dataobj)
+                            profession_response = limit_call(profession['key']['href'], params=dataobj, headers=auth_headers)
                             if profession_response.status_code == 200:
                                 try:
                                     profession_details = profession_response.json()
@@ -1292,7 +1294,7 @@ def fullDataScan(client, secret):
                                     tier_index = profession_details['skill_tiers']
                                     for tier in tier_index:
                                         print('Processing tier: {}'.format(tier['name']))
-                                        tier_response = limit_call(tier['key']['href'], params=dataobj)
+                                        tier_response = limit_call(tier['key']['href'], params=dataobj, headers=auth_headers)
                                         if tier_response.status_code == 200:
                                             try:
                                                 tier_details = tier_response.json()
@@ -1316,7 +1318,7 @@ def fullDataScan(client, secret):
                                                         recipe_index = category['recipes']
                                                         for recipe in recipe_index:
                                                             print('Processing recipe: {}'.format(recipe['name']))
-                                                            recipe_response = limit_call(recipe['key']['href'], params=dataobj)
+                                                            recipe_response = limit_call(recipe['key']['href'], params=dataobj, headers=auth_headers)
                                                             if recipe_response.status_code == 200:
                                                                 try:
                                                                     recipe_details = recipe_response.json()
@@ -1349,14 +1351,14 @@ def fullDataScan(client, secret):
                                                                 try:
                                                                     reagent_index = recipe_details['reagents']
                                                                     for reagent in reagent_index:
-                                                                        reagent_response = limit_call(reagent['reagent']['key']['href'], params=dataobj)
+                                                                        reagent_response = limit_call(reagent['reagent']['key']['href'], params=dataobj, headers=auth_headers)
                                                                         if reagent_response.status_code == 200:
                                                                             try:
                                                                                 reagent_details = reagent_response.json()
                                                                                 try:
                                                                                     obj_reagent = DataReagent.objects.get(reagentId=reagent_details['id'])
                                                                                 except DataReagent.DoesNotExist:
-                                                                                    reagent_media_response = limit_call(reagent_details['media']['key']['href'], params=dataobj)
+                                                                                    reagent_media_response = limit_call(reagent_details['media']['key']['href'], params=dataobj, headers=auth_headers)
                                                                                     if reagent_media_response.status_code == 200:
                                                                                         try:
                                                                                             media = reagent_media_response.json()['assets'][0]['value']
@@ -1403,14 +1405,14 @@ def fullDataScan(client, secret):
                         mount_index = y.json()['mounts']
                         for mount in mount_index:
                             print(mount['name'])
-                            mount_response = limit_call(mount['key']['href'], params=dataobj)
+                            mount_response = limit_call(mount['key']['href'], params=dataobj, headers=auth_headers)
                             if mount_response.status_code == 200:
                                 try:
                                     mount_details = mount_response.json()
                                     try:
                                         obj_mount = DataMount.objects.get(mountId=mount_details['id'])
                                     except DataMount.DoesNotExist:
-                                        mount_media_response = limit_call(mount_details['creature_displays'][0]['key']['href'], params=dataobj)
+                                        mount_media_response = limit_call(mount_details['creature_displays'][0]['key']['href'], params=dataobj, headers=auth_headers)
                                         if mount_media_response.status_code == 200:
                                             try:
                                                 media_zoom = mount_media_response.json()['assets'][0]['value']
@@ -1460,7 +1462,7 @@ def fullDataScan(client, secret):
                         pet_index = y.json()['pets']
                         for pet in pet_index:
                             print(pet['name'])
-                            pet_response = limit_call(pet['key']['href'], params=dataobj)
+                            pet_response = limit_call(pet['key']['href'], params=dataobj, headers=auth_headers)
                             if pet_response.status_code == 200:
                                 try:
                                     pet_details = pet_response.json()
