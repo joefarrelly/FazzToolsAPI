@@ -1363,7 +1363,7 @@ def fullDataScan(client, secret):
                                                                                         except KeyError as e:
                                                                                             media = 'Not Found'
                                                                                     else:
-                                                                                        print(reagent_media_response.status_code)
+                                                                                        print(f"{reagent_media_response.status_code}: {reagent_details['media']['key']['href']}")
                                                                                     obj_reagent = DataReagent.objects.create(
                                                                                         reagentId=reagent_details['id'],
                                                                                         reagentName=reagent_details['name'],
@@ -1381,21 +1381,21 @@ def fullDataScan(client, secret):
                                                                                     quantity=reagent['quantity']
                                                                                 )
                                                                         else:
-                                                                            print(reagent_response.status_code)
+                                                                            print(f"{reagent_response.status_code}: {reagent['reagent']['key']['href']}")
                                                                 except KeyError as e:
                                                                     print(e)
                                                             else:
-                                                                print(recipe_response.status_code)
+                                                                print(f"{recipe_response.status_code}: {recipe['key']['href']}")
                                                     except KeyError as e:
                                                         print(e)
                                             except KeyError as e:
                                                 print(e)
                                         else:
-                                            print(tier_response.status_code)
+                                            print(f"{tier_response.status_code}: {tier['key']['href']}")
                                 except KeyError as e:
                                     print(e)
                             else:
-                                print(profession_response.status_code)
+                                print(f"{profession_response.status_code}: {profession['key']['href']}")
                     except KeyError as e:
                         print(e)
                 elif 'mount' in url:
@@ -1417,7 +1417,7 @@ def fullDataScan(client, secret):
                                             except KeyError as e:
                                                 media_zoom = 'Not Found'
                                         else:
-                                            print(mount_media_response.status_code)
+                                            print(f"{mount_media_response.status_code}: {mount_details['creature_displays'][0]['key']['href']}")
                                         media_icon = 'https://render.worldofwarcraft.com/eu/icons/56/inv_misc_questionmark.jpg'
                                         for item in item_search_details:
                                             try:
@@ -1452,7 +1452,7 @@ def fullDataScan(client, secret):
                                 except KeyError as e:
                                     print(e)
                             else:
-                                print(mount_response.status_code)
+                                print(f"{mount_response.status_code}: {mount['key']['href']}")
                     except KeyError as e:
                         print(e)
                 elif 'pet' in url:
@@ -1506,7 +1506,7 @@ def fullDataScan(client, secret):
                                 except KeyError as e:
                                     print(e)
                             else:
-                                print(pet_response.status_code)
+                                print(f"{pet_response.status_code}: {pet['key']['href']}")
                     except KeyError as e:
                         print(e)
             else:
