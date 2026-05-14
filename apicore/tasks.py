@@ -3,7 +3,7 @@ import requests
 from apicore.models import *
 from types import SimpleNamespace
 from requests.adapters import HTTPAdapter
-from requests.packages.urllib3.util.retry import Retry
+from urllib3.util.retry import Retry
 from django.utils import timezone
 import datetime
 import ast
