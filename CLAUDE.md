@@ -6,15 +6,36 @@ The companion frontend lives at `../FazzToolsFrontend` (React, port 3000 in dev)
 
 ## Stack
 
-- Python 3.8, Django 3.2.8, Django REST Framework 3.12
-- MySQL database (via `mysqlclient`)
-- Celery 5 for async tasks (AMQP broker)
+- Python 3.12, Django 5.2, Django REST Framework 3.15.2
+- MySQL 8 database (via `mysqlclient`)
+- Celery 5 for async tasks (Redis broker)
 - `django-environ` for env var management
-- CORS allowed for `localhost:3000` and `fazztools.hopto.org`
+- Docker Compose for local development (services: `web`, `worker`, `db`, `redis`)
+- CORS origin driven by `FRONTEND_URL` env var
 
 ## Running locally
 
-Requires a `.env` file in the project root with:
+### With Docker (recommended)
+
+```bash
+docker compose up           # Starts web, worker, db, redis
+docker compose exec web python manage.py migrate
+```
+
+Ports exposed locally: `8000` (Django), `3306` (MySQL), `6379` (Redis).
+
+### Without Docker
+
+Requires a running MySQL and Redis instance, then:
+
+```bash
+python manage.py runserver          # Dev server
+celery -A backend worker -l info    # Celery worker (required for scans)
+```
+
+### Environment variables
+
+Copy `.env.example` to `.env` and fill in:
 
 ```
 SECRET_KEY=
@@ -24,17 +45,20 @@ DB_USER=
 DB_PASSWORD=
 DB_HOST=
 DB_PORT=
-HASH_KEY=          # Used to HMAC-hash the Blizzard user ID into our userId
-BLIZZ_CLIENT=      # Blizzard OAuth app client ID
-BLIZZ_SECRET=      # Blizzard OAuth app secret
-BLIZZ_REDIRECT_URI=
-DATA_PASSWORD=     # Password to trigger a full data scan
+CELERY_BROKER_URL=         # redis://redis:6379/0 with Docker
+FRONTEND_URL=              # http://localhost:3000 in dev — drives CORS
+HASH_KEY=                  # Used to HMAC-hash the Blizzard user ID into our userId
+BLIZZ_CLIENT=              # Blizzard OAuth app client ID
+BLIZZ_SECRET=              # Blizzard OAuth app secret
+BLIZZ_REDIRECT_URI=        # Must exactly match the redirect URI registered in Blizzard dev portal
+DATA_PASSWORD=             # Password to trigger a full data scan
 ```
 
-```bash
-python manage.py runserver          # Dev server
-celery -A backend worker -l info    # Celery worker (required for scans)
-```
+After changing `.env`, use `docker compose up -d web` (not `restart`) to pick up the new values.
+
+## Branch flow
+
+`feature branches` → `dev` → `main`
 
 ## Project layout
 
@@ -79,7 +103,7 @@ apicore/          The single Django app
 ## Key data flows
 
 ### Battle.net login
-`BnetLogin.create` → exchanges auth code for token → fetches WoW profile → HMAC-hashes Blizzard user ID → upserts `ProfileUser` and all `ProfileAlt` records.
+`BnetLogin.create` → exchanges auth code for token (using `Authorization: Bearer` header) → fetches WoW profile → HMAC-hashes Blizzard user ID → upserts `ProfileUser` and all `ProfileAlt` records.
 
 ### Alt scan (`fullAltScan` Celery task)
 For each alt belonging to a user, fetches from Blizzard API:
@@ -104,6 +128,8 @@ Fetches Blizzard static data API indexes and walks all professions (tiers → ca
 ## Things to know
 
 - All Blizzard API calls target the **EU** region (`eu.battle.net`, `eu.api.blizzard.com`)
+- Blizzard API authentication uses `Authorization: Bearer <token>` header (query param method was deprecated)
+- `BLIZZ_REDIRECT_URI` must exactly match what the frontend sends in the initial OAuth request — mismatch causes a 400 from Blizzard's token endpoint
 - Equipment variants use a composite `variantCode` built from the item's `bonus_list` IDs concatenated as a string
 - The Lua parser (`recursive()` in views.py) uses two module-level globals (`all_lines`, `index_count`) — it's not thread-safe but works under Celery
 - Several views use a flexible `fields[]` query param pattern to let the frontend request only the columns it needs
