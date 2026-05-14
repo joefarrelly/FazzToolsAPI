@@ -7,3 +7,14 @@ FazzToolsScraper.lua
 test.py
 *.csv
 *.lua
+
+# github rulesets (import-only, not tracked)
+.github/rulesets/
+
+# claude local settings
+.claude/settings.local.json
+
+# Python
+__pycache__/
+*.pyc
+*.pyo

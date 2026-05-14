@@ -15,7 +15,7 @@ from ratelimit import limits, sleep_and_retry
 
 from types import SimpleNamespace
 from requests.adapters import HTTPAdapter
-from requests.packages.urllib3.util.retry import Retry
+from urllib3.util.retry import Retry
 
 from apicore.tasks import fullDataScan, fullAltScan
 from apicore.libs.keybind_mapping import getKeybindMap
@@ -640,11 +640,12 @@ class BnetLogin(viewsets.ViewSet):
             url = 'https://eu.battle.net/oauth/token?grant_type=authorization_code'
             params = {'client_id': request.data.get('client_id'), 'client_secret': BLIZZ_SECRET, 'code': request.data.get('code'), 'redirect_uri': env("BLIZZ_REDIRECT_URI")}
             x = requests.post(url, data=params)
+
             try:
                 token = x.json()['access_token']
-                url = "https://eu.api.blizzard.com/profile/user/wow?namespace=profile-eu&locale=en_US"
-                myobj = {'access_token': token}
-                y = requests.get(url, params=myobj)
+                url = "https://eu.api.blizzard.com/profile/user/wow"
+                myobj = {'namespace': 'profile-eu', 'locale': 'en_US'}
+                y = requests.get(url, params=myobj, headers={'Authorization': f'Bearer {token}'})
                 if y.status_code == 200:
                     encoded = str(y.json()['id']).encode()
                     result = hmac.new(HASH_KEY, encoded, hashlib.sha256).hexdigest()
@@ -714,9 +715,9 @@ class ScanAlt(viewsets.ViewSet):
         return response.Response('nouser')
 
 
-def limit_call(url, params):
+def limit_call(url, params, headers=None):
     try:
-        response = s.get(url, params=params, timeout=5)
+        response = s.get(url, params=params, headers=headers, timeout=5)
         return response
     except requests.exceptions.RequestsException as e:
         temp_response = {'status_code': 999}

@@ -34,7 +34,7 @@ class DataProfessionRecipe(models.Model):
     tier = models.ForeignKey(DataProfessionTier, on_delete=models.CASCADE)
     recipeId = models.PositiveSmallIntegerField(primary_key=True)
     recipeName = models.CharField(max_length=128)
-    recipeDescription = models.CharField(max_length=1024)
+    recipeDescription = models.TextField()
     recipeCategory = models.CharField(max_length=128)
     recipeRank = models.PositiveSmallIntegerField()
     recipeCraftedQuantity = models.PositiveIntegerField()
