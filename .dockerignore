@@ -1,0 +1,11 @@
+.git
+.gitignore
+.env
+__pycache__
+*.pyc
+*.pyo
+media/uploads
+*.lua
+*.csv
+mapping.txt
+test.py

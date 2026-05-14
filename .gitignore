@@ -7,3 +7,8 @@ FazzToolsScraper.lua
 test.py
 *.csv
 *.lua
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
