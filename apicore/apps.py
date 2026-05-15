@@ -2,5 +2,5 @@ from django.apps import AppConfig
 
 
 class ApicoreConfig(AppConfig):
-    default_auto_field = 'django.db.models.BigAutoField'
-    name = 'apicore'
+    default_auto_field = "django.db.models.BigAutoField"
+    name = "apicore"

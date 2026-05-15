@@ -4,13 +4,12 @@ from django.db import migrations
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('apicore', '0003_dataspell'),
+        ("apicore", "0003_dataspell"),
     ]
 
     operations = [
         migrations.DeleteModel(
-            name='DataSpell',
+            name="DataSpell",
         ),
     ]
