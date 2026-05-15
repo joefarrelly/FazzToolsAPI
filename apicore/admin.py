@@ -1,8 +1,16 @@
 from django.contrib import admin
-# from .models import FazzToolsUser, Alt, Profession, ProfessionTier, ProfessionRecipe, AltProfession, AltProfessionData, Equipment, AltEquipment
-from apicore.models import *
 
-# Register your models here.
+from apicore.models import (
+    DataEquipment,
+    DataProfession,
+    DataProfessionRecipe,
+    DataProfessionTier,
+    ProfileAlt,
+    ProfileAltEquipment,
+    ProfileAltProfession,
+    ProfileAltProfessionData,
+    ProfileUser,
+)
 
 admin.site.register(ProfileUser)
 admin.site.register(ProfileAlt)
