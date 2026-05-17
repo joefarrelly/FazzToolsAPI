@@ -22,6 +22,7 @@ class DataProfessionTier(models.Model):
     tier_name = models.CharField(max_length=128)
     tier_min_skill = models.PositiveSmallIntegerField()
     tier_max_skill = models.PositiveSmallIntegerField()
+    tier_order = models.PositiveSmallIntegerField(default=0)
 
     class Meta:
         db_table = "ft_data_professiontier"
@@ -38,6 +39,7 @@ class DataProfessionRecipe(models.Model):
     recipe_category = models.CharField(max_length=128)
     recipe_rank = models.PositiveSmallIntegerField()
     recipe_crafted_quantity = models.PositiveIntegerField()
+    recipe_icon = models.CharField(max_length=256, default="Not Found")
 
     class Meta:
         db_table = "ft_data_professionrecipe"

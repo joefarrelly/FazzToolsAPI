@@ -18,6 +18,7 @@ mysqlclient==2.2.6
 prompt-toolkit==3.0.48
 pytz==2025.1
 ratelimit==2.2.1
+ruff==0.15.13
 redis==5.2.1
 requests==2.32.3
 six==1.17.0
