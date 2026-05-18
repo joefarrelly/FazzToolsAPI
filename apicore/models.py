@@ -22,7 +22,6 @@ class DataProfessionTier(models.Model):
     tier_name = models.CharField(max_length=128)
     tier_min_skill = models.PositiveSmallIntegerField()
     tier_max_skill = models.PositiveSmallIntegerField()
-    tier_order = models.PositiveSmallIntegerField(default=0)
 
     class Meta:
         db_table = "ft_data_professiontier"

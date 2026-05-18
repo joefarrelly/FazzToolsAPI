@@ -390,13 +390,11 @@ def _sync_profession_data(index_data: dict, auth_headers: dict) -> None:
             logger.warning("Failed to parse profession: %s", exc)
             continue
 
-        for order, tier_ref in enumerate(details.get("skill_tiers", [])):
-            _sync_tier_data(tier_ref, order, profession, auth_headers)
+        for tier_ref in details.get("skill_tiers", []):
+            _sync_tier_data(tier_ref, profession, auth_headers)
 
 
-def _sync_tier_data(
-    tier_ref: dict, order: int, profession: DataProfession, auth_headers: dict
-) -> None:
+def _sync_tier_data(tier_ref: dict, profession: DataProfession, auth_headers: dict) -> None:
     logger.info("Processing tier: %s", tier_ref["name"])
     resp = _api_get(tier_ref["key"]["href"], _STATIC_PARAMS, auth_headers)
     if resp.status_code != 200:
@@ -405,14 +403,13 @@ def _sync_tier_data(
 
     try:
         details = resp.json()
-        tier, _ = DataProfessionTier.objects.update_or_create(
+        tier, _ = DataProfessionTier.objects.get_or_create(
             tier_id=details["id"],
             defaults={
                 "profession": profession,
                 "tier_name": details["name"],
                 "tier_min_skill": details["minimum_skill_level"],
                 "tier_max_skill": details["maximum_skill_level"],
-                "tier_order": order,
             },
         )
     except (KeyError, TypeError) as exc:

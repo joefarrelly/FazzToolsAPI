@@ -491,6 +491,31 @@ class ProfileAltProfessionView(viewsets.ModelViewSet):
         return response.Response(alts)
 
 
+_EXPANSION_ORDER: dict[str, int] = {
+    "classic": 0,
+    "outland": 1,
+    "northrend": 2,
+    "cataclysm": 3,
+    "pandaria": 4,
+    "draenor": 5,
+    "legion": 6,
+    "kul tiran": 7,
+    "zandalari": 7,
+    "shadowlands": 8,
+    "dragon isles": 9,
+    "khaz algar": 10,
+    "midnight": 11,
+}
+
+
+def _tier_sort_key(tier_name: str) -> int:
+    name_lower = tier_name.lower()
+    for keyword, order in _EXPANSION_ORDER.items():
+        if keyword in name_lower:
+            return order
+    return 999
+
+
 class ProfileAltProfessionDataView(viewsets.ModelViewSet):
     serializer_class = ProfileAltProfessionDataSerializer
     queryset = ProfileAltProfessionData.objects.all()
@@ -527,7 +552,7 @@ class ProfileAltProfessionDataView(viewsets.ModelViewSet):
                     queryset=DataRecipeReagent.objects.select_related("reagent"),
                 )
             )
-            .order_by("-tier__tier_order", "recipe_name")
+            .order_by("recipe_name")
         )
 
         # One entry per (tier, category, name) family — highest learned rank wins,
@@ -573,7 +598,9 @@ class ProfileAltProfessionDataView(viewsets.ModelViewSet):
 
         result = [
             [tier_name, sorted(cats.items())]
-            for tier_name, cats in tiers.items()
+            for tier_name, cats in sorted(
+                tiers.items(), key=lambda x: _tier_sort_key(x[0]), reverse=True
+            )
         ]
 
         return response.Response(result)
