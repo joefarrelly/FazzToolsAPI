@@ -9,6 +9,7 @@ import time
 
 import environ
 import requests
+from django.db import models
 from django.utils import timezone
 from requests.adapters import HTTPAdapter
 from rest_framework import response, viewsets
@@ -490,6 +491,31 @@ class ProfileAltProfessionView(viewsets.ModelViewSet):
         return response.Response(alts)
 
 
+_EXPANSION_ORDER: dict[str, int] = {
+    "classic": 0,
+    "outland": 1,
+    "northrend": 2,
+    "cataclysm": 3,
+    "pandaria": 4,
+    "draenor": 5,
+    "legion": 6,
+    "kul tiran": 7,
+    "zandalari": 7,
+    "shadowlands": 8,
+    "dragon isles": 9,
+    "khaz algar": 10,
+    "midnight": 11,
+}
+
+
+def _tier_sort_key(tier_name: str) -> int:
+    name_lower = tier_name.lower()
+    for keyword, order in _EXPANSION_ORDER.items():
+        if keyword in name_lower:
+            return order
+    return 999
+
+
 class ProfileAltProfessionDataView(viewsets.ModelViewSet):
     serializer_class = ProfileAltProfessionDataSerializer
     queryset = ProfileAltProfessionData.objects.all()
@@ -510,14 +536,46 @@ class ProfileAltProfessionDataView(viewsets.ModelViewSet):
         if alt is None or profession is None:
             return response.Response({})
 
-        queryset = ProfileAltProfessionData.objects.select_related(
-            "profession", "profession_tier", "profession_recipe"
-        ).filter(alt=alt.alt_id, profession=profession.profession_id)
+        learned_ids = set(
+            ProfileAltProfessionData.objects.filter(
+                alt=alt.alt_id, profession=profession.profession_id
+            ).values_list("profession_recipe_id", flat=True)
+        )
+
+        profession_tiers = DataProfessionTier.objects.filter(profession=profession)
+        recipes = (
+            DataProfessionRecipe.objects.filter(tier__in=profession_tiers)
+            .select_related("tier")
+            .prefetch_related(
+                models.Prefetch(
+                    "datarecipereagent_set",
+                    queryset=DataRecipeReagent.objects.select_related("reagent"),
+                )
+            )
+            .order_by("recipe_name")
+        )
+
+        # One entry per (tier, category, name) family — highest learned rank wins,
+        # falling back to lowest unlearned rank if nothing is learned.
+        families: dict[tuple[str, str, str], tuple[object, bool]] = {}
+        for recipe in recipes:
+            family_key = (recipe.tier.tier_name, recipe.recipe_category, recipe.recipe_name)
+            is_learned = recipe.recipe_id in learned_ids
+            if family_key not in families:
+                families[family_key] = (recipe, is_learned)
+            else:
+                existing_recipe, existing_learned = families[family_key]
+                if is_learned and not existing_learned:
+                    families[family_key] = (recipe, True)
+                elif is_learned == existing_learned and (
+                    recipe.recipe_rank > existing_recipe.recipe_rank
+                ):
+                    families[family_key] = (recipe, is_learned)
 
         tiers: dict[str, dict] = {}
-        for entry in queryset:
-            tier_bucket = tiers.setdefault(entry.profession_tier.tier_name, {})
-            category_list = tier_bucket.setdefault(entry.profession_recipe.recipe_category, [])
+        for (tier_name, category, _), (recipe, is_learned) in families.items():
+            tier_bucket = tiers.setdefault(tier_name, {})
+            category_list = tier_bucket.setdefault(category, [])
 
             mats = [
                 [
@@ -526,22 +584,24 @@ class ProfileAltProfessionDataView(viewsets.ModelViewSet):
                     r.reagent.reagent_media,
                     r.reagent.reagent_quality,
                 ]
-                for r in DataRecipeReagent.objects.select_related("reagent").filter(
-                    recipe=entry.profession_recipe
-                )
+                for r in recipe.datarecipereagent_set.all()
             ]
             recipe_row = [
-                entry.profession_recipe.recipe_name,
-                entry.profession_recipe.recipe_rank,
-                entry.profession_recipe.recipe_crafted_quantity,
+                recipe.recipe_name,
+                is_learned,
+                recipe.recipe_rank,
+                recipe.recipe_crafted_quantity,
+                recipe.recipe_icon,
                 *mats,
             ]
             category_list.append(recipe_row)
 
-        result = [[tier_name, list(cats.items())] for tier_name, cats in tiers.items()]
-
-        if result and "Shadowlands" in result[-1][0]:
-            result.insert(0, result.pop())
+        result = [
+            [tier_name, sorted(cats.items())]
+            for tier_name, cats in sorted(
+                tiers.items(), key=lambda x: _tier_sort_key(x[0]), reverse=True
+            )
+        ]
 
         return response.Response(result)
 

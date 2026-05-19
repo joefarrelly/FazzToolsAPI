@@ -432,7 +432,26 @@ def _sync_recipe_data(
 
     try:
         details = resp.json()
-        DataProfessionRecipe.objects.get_or_create(
+        crafted_item_href = details.get("crafted_item", {}).get("key", {}).get("href")
+        if crafted_item_href:
+            item_resp = _api_get(crafted_item_href, _STATIC_PARAMS, auth_headers)
+            media_href = (
+                item_resp.json().get("media", {}).get("key", {}).get("href")
+                if item_resp.status_code == 200
+                else None
+            )
+        else:
+            media_href = details.get("media", {}).get("key", {}).get("href")
+        if media_href:
+            media_resp = _api_get(media_href, _STATIC_PARAMS, auth_headers)
+            recipe_icon = (
+                media_resp.json().get("assets", [{}])[0].get("value", "Not Found")
+                if media_resp.status_code == 200
+                else "Not Found"
+            )
+        else:
+            recipe_icon = "Not Found"
+        recipe, _ = DataProfessionRecipe.objects.update_or_create(
             recipe_id=details["id"],
             defaults={
                 "tier": tier,
@@ -441,13 +460,13 @@ def _sync_recipe_data(
                 "recipe_category": category_name,
                 "recipe_rank": details.get("rank", 1),
                 "recipe_crafted_quantity": (details.get("crafted_quantity", {}).get("value", 1)),
+                "recipe_icon": recipe_icon,
             },
         )
     except (KeyError, TypeError) as exc:
         logger.warning("Failed to parse recipe %s: %s", recipe_ref["name"], exc)
         return
 
-    recipe = DataProfessionRecipe.objects.get(recipe_id=details["id"])
     for reagent_ref in details.get("reagents", []):
         _sync_reagent_data(reagent_ref, recipe, auth_headers)
 
