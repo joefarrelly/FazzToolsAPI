@@ -4,15 +4,14 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('apicore', '0008_rename_snake_case'),
+        ("apicore", "0008_rename_snake_case"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='dataprofessionrecipe',
-            name='recipe_icon',
-            field=models.CharField(default='Not Found', max_length=256),
+            model_name="dataprofessionrecipe",
+            name="recipe_icon",
+            field=models.CharField(default="Not Found", max_length=256),
         ),
     ]
