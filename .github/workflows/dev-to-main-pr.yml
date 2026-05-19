@@ -18,10 +18,11 @@ jobs:
           MERGED_BRANCH: ${{ github.event.pull_request.head.ref }}
           REPO: ${{ github.repository }}
         run: |
+          OWNER="${REPO%%/*}"
           EXISTING=$(gh pr list \
             --repo "$REPO" \
             --base main \
-            --head dev \
+            --head "${OWNER}:dev" \
             --json number,body)
 
           PR_NUMBER=$(echo "$EXISTING" | jq -r '.[0].number // empty')
