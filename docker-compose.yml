@@ -33,6 +33,8 @@ services:
       - "8000:8000"
     env_file:
       - .env
+    environment:
+      - RUFF_CACHE_DIR=/tmp/.ruff_cache
     depends_on:
       db:
         condition: service_healthy
@@ -41,7 +43,21 @@ services:
 
   worker:
     build: .
-    command: celery -A backend worker -l info
+    command: celery -A backend worker -l info -Q celery
+    volumes:
+      - .:/app
+      - media_data:/app/media
+    env_file:
+      - .env
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+
+  alt_scan_worker:
+    build: .
+    command: celery -A backend worker -l info --concurrency=5 -Q alt_scan
     volumes:
       - .:/app
       - media_data:/app/media
