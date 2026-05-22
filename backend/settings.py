@@ -11,7 +11,7 @@ SECRET_KEY = env("SECRET_KEY")
 
 DEBUG = env("DEBUG_OPTION")
 
-ALLOWED_HOSTS = ["127.0.0.1", "localhost", "fazztoolsapi.ddns.net"]
+ALLOWED_HOSTS = ["127.0.0.1", "localhost", "fazztoolsapi.ddns.net", "api.fazzwow.uk"]
 
 INSTALLED_APPS = [
     "django.contrib.admin",
