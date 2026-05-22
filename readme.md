@@ -1,5 +1,7 @@
 # FazzToolsAPI
 
+[![Deploy](https://github.com/joefarrelly/FazzToolsAPI/actions/workflows/deploy.yml/badge.svg)](https://github.com/joefarrelly/FazzToolsAPI/actions/workflows/deploy.yml)
+
 Django REST Framework backend for **FazzTools** — a World of Warcraft companion app.
 
 Syncs character data (professions, equipment, mounts, pets) from the Blizzard Battle.net API and parses WoW Lua addon exports to serve keybind data.
