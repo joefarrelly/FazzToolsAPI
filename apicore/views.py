@@ -13,6 +13,8 @@ from django.db import models
 from django.utils import timezone
 from requests.adapters import HTTPAdapter
 from rest_framework import response, viewsets
+from rest_framework.exceptions import PermissionDenied
+from rest_framework.permissions import IsAdminUser
 from urllib3.util.retry import Retry
 
 from apicore.libs.keybind_mapping import getKeybindMap
@@ -35,6 +37,7 @@ from apicore.models import (
     ProfileUserMount,
     ProfileUserPet,
 )
+from apicore.permissions import IsSessionUser
 from apicore.serializers import (
     DataEquipmentSerializer,
     DataEquipmentVariantSerializer,
@@ -127,8 +130,15 @@ class ProfileUserView(viewsets.ModelViewSet):
     serializer_class = ProfileUserSerializer
     queryset = ProfileUser.objects.all()
 
+    def get_permissions(self):
+        if self.action == "list":
+            return [IsSessionUser()]
+        return []
+
     def perform_update(self, serializer):
         user_id = serializer.validated_data.get("user_id")
+        if self.request.session.get("user_id") != user_id:
+            raise PermissionDenied()
         file = serializer.validated_data.get("user_file")
 
         logger.info("File upload attempt: %s", file.name)
@@ -320,6 +330,7 @@ def _build_single_keybinds(data: dict, alt: str, realm: str, spec: str) -> list:
 class ProfileUserMountView(viewsets.ModelViewSet):
     serializer_class = ProfileUserMountSerializer
     queryset = ProfileUserMount.objects.all()
+    permission_classes = [IsSessionUser]
 
     def list(self, request):
         user_id = request.query_params.get("user")
@@ -364,6 +375,7 @@ class ProfileUserMountView(viewsets.ModelViewSet):
 class ProfileUserPetView(viewsets.ModelViewSet):
     serializer_class = ProfileUserPetSerializer
     queryset = ProfileUserPet.objects.all()
+    permission_classes = [IsSessionUser]
 
     def list(self, request):
         user_id = request.query_params.get("user")
@@ -412,6 +424,7 @@ class ProfileUserPetView(viewsets.ModelViewSet):
 class ProfileAltView(viewsets.ModelViewSet):
     serializer_class = ProfileAltSerializer
     queryset = ProfileAlt.objects.all()
+    permission_classes = [IsSessionUser]
 
     def list(self, request):
         user_id = request.query_params.get("user")
@@ -452,6 +465,7 @@ class ProfileAltView(viewsets.ModelViewSet):
 class ProfileAltProfessionView(viewsets.ModelViewSet):
     serializer_class = ProfileAltProfessionSerializer
     queryset = ProfileAltProfession.objects.all()
+    permission_classes = [IsSessionUser]
 
     def list(self, request):
         user_id = request.query_params.get("user")
@@ -535,6 +549,9 @@ class ProfileAltProfessionDataView(viewsets.ModelViewSet):
 
         if alt is None or profession is None:
             return response.Response({})
+
+        if alt.user_id != request.session.get("user_id"):
+            return response.Response({}, status=403)
 
         learned_ids = set(
             ProfileAltProfessionData.objects.filter(
@@ -626,6 +643,9 @@ class ProfileAltEquipmentView(viewsets.ModelViewSet):
         if user_id is None:
             return response.Response([])
 
+        if request.session.get("user_id") != user_id:
+            return response.Response([], status=403)
+
         alt_ids = ProfileAlt.objects.filter(user=user_id).values_list("alt_id", flat=True)
         queryset = (
             ProfileAltEquipment.objects.filter(alt__in=alt_ids)
@@ -694,6 +714,9 @@ class ProfileAltEquipmentView(viewsets.ModelViewSet):
         alt = ProfileAlt.objects.filter(alt_name=alt_name, alt_realm_slug=realm_slug).first()
         if alt is None:
             return response.Response([])
+
+        if alt.user_id != request.session.get("user_id"):
+            return response.Response([], status=403)
 
         try:
             record = ProfileAltEquipment.objects.get(alt=alt)
@@ -803,6 +826,8 @@ class BnetLogin(viewsets.ViewSet):
                     },
                 )
 
+        request.session["user_id"] = user_id
+
         return response.Response({"user": user_id, "alts": alt_ids})
 
 
@@ -811,13 +836,15 @@ class ScanAlt(viewsets.ViewSet):
         user_id = request.data.get("userid")
         if not user_id:
             return response.Response("nouser")
+        if request.session.get("user_id") != user_id:
+            return response.Response("forbidden", status=403)
         fullAltScan.delay(user_id, BLIZZ_CLIENT, BLIZZ_SECRET)
         return response.Response(timezone.now())
 
 
 class DataScan(viewsets.ViewSet):
+    permission_classes = [IsAdminUser]
+
     def create(self, request):
-        if request.data.get("password") != env("DATA_PASSWORD"):
-            return response.Response("Incorrect Password")
         fullDataScan.delay(BLIZZ_CLIENT, BLIZZ_SECRET)
-        return response.Response("Password Correct")
+        return response.Response("Scan started")
