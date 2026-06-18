@@ -9,6 +9,7 @@ import time
 
 import environ
 import requests
+from django.core.cache import cache
 from django.db import models
 from django.utils import timezone
 from requests.adapters import HTTPAdapter
@@ -152,19 +153,17 @@ class ProfileUserView(viewsets.ModelViewSet):
             return
 
         file.name = user_id + ".lua"
-        f = file.open("r+")
-        content = f.read().decode("utf-8")
+        with file.open("r+") as f:
+            content = f.read().decode("utf-8")
 
-        if "FazzToolsScraperDB" not in content[0:25]:
-            logger.warning("Rejected upload: invalid file header")
-            f.close()
-            return
+            if "FazzToolsScraperDB" not in content[0:25]:
+                logger.warning("Rejected upload: invalid file header")
+                return
 
-        normalised = re.sub(r'(\r\n|\r|\n)(?=(?:[^"]*"[^"]*")*[^"]*$)', r"\n", content)
-        f.seek(0)
-        f.write(normalised.encode())
-        f.truncate()
-        f.close()
+            normalised = re.sub(r'(\r\n|\r|\n)(?=(?:[^"]*"[^"]*")*[^"]*$)', r"\n", content)
+            f.seek(0)
+            f.write(normalised.encode())
+            f.truncate()
 
         user_obj = ProfileUser.objects.get(user_id=user_id)
         update_date = user_obj.user_last_update
@@ -176,6 +175,7 @@ class ProfileUserView(viewsets.ModelViewSet):
             logger.warning("Could not remove old file: %s", exc)
 
         serializer.save(user_id=user_id, user_file=file, user_last_update=update_date)
+        cache.delete(f"keybinds:{user_id}")
 
     def list(self, request):
         user_id = request.query_params.get("user")
@@ -196,10 +196,13 @@ class ProfileUserView(viewsets.ModelViewSet):
         if not user_obj.user_file:
             return response.Response([])
 
-        lines = [line.decode("utf-8") for line in user_obj.user_file.file.open("r").readlines()]
-        user_obj.user_file.file.close()
-
-        data = LuaParser(lines).parse()
+        cache_key = f"keybinds:{user_id}"
+        data = cache.get(cache_key)
+        if data is None:
+            with user_obj.user_file.open("r") as f:
+                lines = [line.decode("utf-8") for line in f.readlines()]
+            data = LuaParser(lines).parse()
+            cache.set(cache_key, data, timeout=None)
 
         if page == "all":
             return response.Response(_build_all_keybinds(data, user_id))
