@@ -51,7 +51,6 @@ HASH_KEY=                  # Used to HMAC-hash the Blizzard user ID into our use
 BLIZZ_CLIENT=              # Blizzard OAuth app client ID
 BLIZZ_SECRET=              # Blizzard OAuth app secret
 BLIZZ_REDIRECT_URI=        # Must exactly match the redirect URI registered in Blizzard dev portal
-DATA_PASSWORD=             # Password to trigger a full data scan
 ```
 
 After changing `.env`, use `docker compose up -d web` (not `restart`) to pick up the new values.
@@ -63,14 +62,22 @@ After changing `.env`, use `docker compose up -d web` (not `restart`) to pick up
 ## Project layout
 
 ```
-backend/          Django project config (settings, urls, celery, wsgi)
-apicore/          The single Django app
-  models.py       All DB models
-  views.py        All ViewSets + Lua file parser
-  tasks.py        Celery tasks (fullAltScan, fullDataScan)
-  serializers.py  DRF serializers
-  libs/           Helper mappings (keybind_mapping, icon_mapping)
-  migrations/     DB migrations
+backend/                Django project config (settings, urls, celery, wsgi)
+  test_settings.py      Overrides DB→SQLite and cache→locmem for pytest
+apicore/                The single Django app
+  models.py             All DB models
+  views.py              All ViewSets + Lua file parser
+  tasks.py              Celery tasks (fullAltScan, fullDataScan)
+  serializers.py        DRF serializers
+  permissions.py        IsSessionUser permission class
+  libs/
+    keybind_builder.py  Pure keybind-building logic (build_all/single_keybinds, tier_sort_key)
+    keybind_mapping.py  Slot→action-button mappings per addon
+    lua_parser.py       Hand-rolled Lua-table-to-JSON converter
+    icon_mapping.py     Mount/pet icon mappings
+  migrations/           DB migrations
+tests/                  pytest suite (47 tests); run via pytest tests/
+conftest.py             pytest env-var setup (pytest_configure hook)
 ```
 
 ## API URL structure
@@ -98,7 +105,7 @@ apicore/          The single Django app
 ### Custom endpoints
 - `POST /api/custom/bnetlogin/` — Battle.net OAuth2 callback; creates/updates user and syncs alts
 - `POST /api/custom/scanalt/` — Triggers `fullAltScan` Celery task for a user
-- `POST /api/custom/datascan/` — Triggers `fullDataScan` Celery task (password-protected)
+- `POST /api/custom/datascan/` — Triggers `fullDataScan` Celery task (Django admin user required)
 
 ## Key data flows
 
@@ -135,4 +142,5 @@ Fetches Blizzard static data API indexes and walks all professions (tiers → ca
 - Several views use a flexible `fields[]` query param pattern to let the frontend request only the columns it needs
 - `ProfileAltEquipment` stores equipment as `"equipmentId:variantCode"` strings rather than FK relations
 - Expiry dates (`altExpiryDate`, `altProfessionExpiryDate`, etc.) are set to `now + 30 days` on each scan but are not actively enforced server-side
-- `DataScan` is password-protected via `DATA_PASSWORD` env var — not authed via the normal auth system
+- `DataScan` requires a Django admin user (`IsAdminUser`) — not the session-based auth used by profile endpoints
+- Session auth: `BnetLogin` sets `request.session["user_id"]` on login; profile views enforce it via `IsSessionUser` (checks session against `?user=` param). `CORS_ALLOW_CREDENTIALS = True` is required for cookies to flow cross-origin.

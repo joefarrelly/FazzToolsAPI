@@ -1,6 +1,7 @@
 # ignored files
 
 .env
+dump.txt
 /media/uploads
 mapping.txt
 FazzToolsScraper.lua
@@ -18,3 +19,5 @@ test.py
 __pycache__/
 *.pyc
 *.pyo
+coverage.xml
+.coverage

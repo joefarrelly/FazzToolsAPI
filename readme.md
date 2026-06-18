@@ -1,6 +1,9 @@
 # FazzToolsAPI
 
 [![Deploy](https://github.com/joefarrelly/FazzToolsAPI/actions/workflows/deploy.yml/badge.svg)](https://github.com/joefarrelly/FazzToolsAPI/actions/workflows/deploy.yml)
+[![Lint and Test](https://github.com/joefarrelly/FazzToolsAPI/actions/workflows/lint.yml/badge.svg)](https://github.com/joefarrelly/FazzToolsAPI/actions/workflows/lint.yml)
+[![codecov](https://codecov.io/gh/joefarrelly/FazzToolsAPI/graph/badge.svg)](https://codecov.io/gh/joefarrelly/FazzToolsAPI)
+[![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 
 Django REST Framework backend for **FazzTools** — a World of Warcraft companion app.
 
@@ -49,7 +52,6 @@ See `.env.example` for the full list. Key ones:
 | `BLIZZ_SECRET` | Blizzard OAuth app secret |
 | `BLIZZ_REDIRECT_URI` | Must exactly match the redirect URI used by the frontend OAuth flow |
 | `HASH_KEY` | Secret used to HMAC-hash the Blizzard user ID |
-| `DATA_PASSWORD` | Password to trigger a full data scan |
 
 > After changing `.env`, run `docker compose up -d web` rather than `docker compose restart` — `restart` does not re-read env files.
 
@@ -59,7 +61,7 @@ See `.env.example` for the full list. Key ones:
 |--------|-------------|
 | `POST /api/custom/bnetlogin/` | Battle.net OAuth2 callback — logs in / creates user |
 | `POST /api/custom/scanalt/` | Triggers async alt scan for a user |
-| `POST /api/custom/datascan/` | Triggers async static data scan (password-protected) |
+| `POST /api/custom/datascan/` | Triggers async static data scan (Django admin user required) |
 | `/api/profile/` | User profile data (alts, professions, equipment, mounts, pets) |
 | `/api/data/` | Static WoW game data |
 

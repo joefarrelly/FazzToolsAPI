@@ -9,13 +9,16 @@ import time
 
 import environ
 import requests
+from django.core.cache import cache
 from django.db import models
 from django.utils import timezone
 from requests.adapters import HTTPAdapter
 from rest_framework import response, viewsets
+from rest_framework.exceptions import PermissionDenied
+from rest_framework.permissions import IsAdminUser
 from urllib3.util.retry import Retry
 
-from apicore.libs.keybind_mapping import getKeybindMap
+from apicore.libs.keybind_builder import build_all_keybinds, build_single_keybinds, tier_sort_key
 from apicore.libs.lua_parser import LuaParser
 from apicore.models import (
     DataEquipment,
@@ -35,6 +38,7 @@ from apicore.models import (
     ProfileUserMount,
     ProfileUserPet,
 )
+from apicore.permissions import IsSessionUser
 from apicore.serializers import (
     DataEquipmentSerializer,
     DataEquipmentVariantSerializer,
@@ -127,8 +131,15 @@ class ProfileUserView(viewsets.ModelViewSet):
     serializer_class = ProfileUserSerializer
     queryset = ProfileUser.objects.all()
 
+    def get_permissions(self):
+        if self.action == "list":
+            return [IsSessionUser()]
+        return []
+
     def perform_update(self, serializer):
         user_id = serializer.validated_data.get("user_id")
+        if self.request.session.get("user_id") != user_id:
+            raise PermissionDenied()
         file = serializer.validated_data.get("user_file")
 
         logger.info("File upload attempt: %s", file.name)
@@ -142,19 +153,17 @@ class ProfileUserView(viewsets.ModelViewSet):
             return
 
         file.name = user_id + ".lua"
-        f = file.open("r+")
-        content = f.read().decode("utf-8")
+        with file.open("r+") as f:
+            content = f.read().decode("utf-8")
 
-        if "FazzToolsScraperDB" not in content[0:25]:
-            logger.warning("Rejected upload: invalid file header")
-            f.close()
-            return
+            if "FazzToolsScraperDB" not in content[0:25]:
+                logger.warning("Rejected upload: invalid file header")
+                return
 
-        normalised = re.sub(r'(\r\n|\r|\n)(?=(?:[^"]*"[^"]*")*[^"]*$)', r"\n", content)
-        f.seek(0)
-        f.write(normalised.encode())
-        f.truncate()
-        f.close()
+            normalised = re.sub(r'(\r\n|\r|\n)(?=(?:[^"]*"[^"]*")*[^"]*$)', r"\n", content)
+            f.seek(0)
+            f.write(normalised.encode())
+            f.truncate()
 
         user_obj = ProfileUser.objects.get(user_id=user_id)
         update_date = user_obj.user_last_update
@@ -166,6 +175,7 @@ class ProfileUserView(viewsets.ModelViewSet):
             logger.warning("Could not remove old file: %s", exc)
 
         serializer.save(user_id=user_id, user_file=file, user_last_update=update_date)
+        cache.delete(f"keybinds:{user_id}")
 
     def list(self, request):
         user_id = request.query_params.get("user")
@@ -186,140 +196,30 @@ class ProfileUserView(viewsets.ModelViewSet):
         if not user_obj.user_file:
             return response.Response([])
 
-        lines = [line.decode("utf-8") for line in user_obj.user_file.file.open("r").readlines()]
-        user_obj.user_file.file.close()
-
-        data = LuaParser(lines).parse()
+        cache_key = f"keybinds:{user_id}"
+        data = cache.get(cache_key)
+        if data is None:
+            with user_obj.user_file.open("r") as f:
+                lines = [line.decode("utf-8") for line in f.readlines()]
+            data = LuaParser(lines).parse()
+            cache.set(cache_key, data, timeout=None)
 
         if page == "all":
-            return response.Response(_build_all_keybinds(data, user_id))
+            return response.Response(build_all_keybinds(data, user_id))
 
         if page == "single":
             alt_name = request.query_params.get("alt", "").title()
             realm = string.capwords(request.query_params.get("realm", ""))
             spec = request.query_params.get("spec", "").title()
-            return response.Response(_build_single_keybinds(data, alt_name, realm, spec))
+            return response.Response(build_single_keybinds(data, alt_name, realm, spec))
 
         return response.Response([])
-
-
-def _build_all_keybinds(data: dict, user_id: str) -> list:
-    result = []
-    for alt_key, alt_config in data.get("alts", {}).items():
-        specs = []
-        try:
-            if alt_config.get("kb") is not None:
-                specs = list(alt_config["kb"].keys())
-            else:
-                specs = ["---", "---", "---", "---"]
-        except (KeyError, TypeError):
-            specs = ["---", "---", "---", "---"]
-
-        specs.sort()
-        while len(specs) < 4:
-            specs.append("---")
-
-        name, realm = (alt_key.split("-", 1) + [""])[:2]
-        try:
-            alt_obj = ProfileAlt.objects.get(alt_name=name, alt_realm=realm)
-            row = [name, realm, alt_obj.get_alt_class_display()] + specs
-            result.append(row)
-        except ProfileAlt.DoesNotExist:
-            logger.debug("Alt not in DB: %s", alt_key)
-
-    result.sort(key=lambda x: (x[1], x[0]))
-    return result
-
-
-def _build_single_keybinds(data: dict, alt: str, realm: str, spec: str) -> list:
-    alt_key = f"{alt}-{realm}"
-    alt_config = data["alts"][alt_key]
-    keybind_map = getKeybindMap(alt_config["kbConfig"]["addon"])
-
-    user_keybind: dict[str, str] = {}
-    for slot, nice_spell in alt_config["kb"][spec].items():
-        prefix = nice_spell.split(":")[0]
-
-        if prefix == "spell":
-            try:
-                user_keybind[nice_spell] = alt_config["kbConfig"]["map"][keybind_map[int(slot)]]
-            except (KeyError, ValueError):
-                pass
-
-        elif prefix == "macro":
-            macro_name = nice_spell.split(":")[1]
-            found = False
-            for tab in alt_config.get("spell", {}).get(spec, {}):
-                for spell_id, spell_info in alt_config["spell"][spec][tab].items():
-                    if spell_info[0] in alt_config["macro"][macro_name][2]:
-                        found = True
-                        spell_key = f"spell:{spell_id}"
-                        try:
-                            bound = alt_config["kbConfig"]["map"][keybind_map[int(slot)]]
-                        except (KeyError, ValueError):
-                            continue
-                        if spell_key not in user_keybind:
-                            user_keybind[spell_key] = bound
-                        elif user_keybind[spell_key] != bound:
-                            user_keybind[spell_key] += f" | {bound}"
-            if not found:
-                try:
-                    user_keybind[nice_spell] = alt_config["kbConfig"]["map"][keybind_map[int(slot)]]
-                except (KeyError, ValueError):
-                    pass
-
-        elif prefix == "item":
-            item_name = nice_spell.split(":")[1]
-            if item_name in alt_config.get("item", {}):
-                try:
-                    user_keybind[nice_spell] = alt_config["kbConfig"]["map"][keybind_map[int(slot)]]
-                except (KeyError, ValueError):
-                    pass
-
-    SPAM_FILTER = {
-        "Auto Attack",
-        "Mobile Banking",
-        "Revive Battle Pets",
-        "Vindicaar Matrix Crystal",
-        "Shoot",
-    }
-    SECTION_ORDER = {"Base": 0, "Talent": 1, "Misc": 2}
-
-    full_result = []
-    for tab in alt_config.get("spell", {}).get(spec, {}):
-        spells = []
-        for spell_id, spell_info in alt_config["spell"][spec][tab].items():
-            if spell_info[0] in SPAM_FILTER:
-                continue
-            entry = [spell_info[0]]
-            if len(spell_info) > 1:
-                entry.append(spell_info[1])
-            entry.append(user_keybind.get(f"spell:{spell_id}", "UNBOUND"))
-            spells.append(entry)
-        spells.sort(key=lambda x: x[0])
-        full_result.append([tab.title(), spells])
-
-    misc = []
-    for item_name, item_info in alt_config.get("item", {}).items():
-        if f"item:{item_name}" in user_keybind:
-            misc.append([item_info[0], user_keybind[f"item:{item_name}"]])
-    for macro_name, macro_info in alt_config.get("macro", {}).items():
-        if f"macro:{macro_name}" in user_keybind:
-            misc.append([f"[Macro] {macro_info[0]}", user_keybind[f"macro:{macro_name}"]])
-    misc.sort(key=lambda x: x[0])
-    full_result.append(["Misc", misc])
-
-    full_result.sort(key=lambda x: SECTION_ORDER.get(x[0], 99))
-
-    if len(full_result) >= 2:
-        full_result[0][1] = [x for x in full_result[0][1] if x not in full_result[1][1]]
-
-    return full_result
 
 
 class ProfileUserMountView(viewsets.ModelViewSet):
     serializer_class = ProfileUserMountSerializer
     queryset = ProfileUserMount.objects.all()
+    permission_classes = [IsSessionUser]
 
     def list(self, request):
         user_id = request.query_params.get("user")
@@ -364,6 +264,7 @@ class ProfileUserMountView(viewsets.ModelViewSet):
 class ProfileUserPetView(viewsets.ModelViewSet):
     serializer_class = ProfileUserPetSerializer
     queryset = ProfileUserPet.objects.all()
+    permission_classes = [IsSessionUser]
 
     def list(self, request):
         user_id = request.query_params.get("user")
@@ -412,6 +313,7 @@ class ProfileUserPetView(viewsets.ModelViewSet):
 class ProfileAltView(viewsets.ModelViewSet):
     serializer_class = ProfileAltSerializer
     queryset = ProfileAlt.objects.all()
+    permission_classes = [IsSessionUser]
 
     def list(self, request):
         user_id = request.query_params.get("user")
@@ -452,6 +354,7 @@ class ProfileAltView(viewsets.ModelViewSet):
 class ProfileAltProfessionView(viewsets.ModelViewSet):
     serializer_class = ProfileAltProfessionSerializer
     queryset = ProfileAltProfession.objects.all()
+    permission_classes = [IsSessionUser]
 
     def list(self, request):
         user_id = request.query_params.get("user")
@@ -491,31 +394,6 @@ class ProfileAltProfessionView(viewsets.ModelViewSet):
         return response.Response(alts)
 
 
-_EXPANSION_ORDER: dict[str, int] = {
-    "classic": 0,
-    "outland": 1,
-    "northrend": 2,
-    "cataclysm": 3,
-    "pandaria": 4,
-    "draenor": 5,
-    "legion": 6,
-    "kul tiran": 7,
-    "zandalari": 7,
-    "shadowlands": 8,
-    "dragon isles": 9,
-    "khaz algar": 10,
-    "midnight": 11,
-}
-
-
-def _tier_sort_key(tier_name: str) -> int:
-    name_lower = tier_name.lower()
-    for keyword, order in _EXPANSION_ORDER.items():
-        if keyword in name_lower:
-            return order
-    return 999
-
-
 class ProfileAltProfessionDataView(viewsets.ModelViewSet):
     serializer_class = ProfileAltProfessionDataSerializer
     queryset = ProfileAltProfessionData.objects.all()
@@ -535,6 +413,9 @@ class ProfileAltProfessionDataView(viewsets.ModelViewSet):
 
         if alt is None or profession is None:
             return response.Response({})
+
+        if alt.user_id != request.session.get("user_id"):
+            return response.Response({}, status=403)
 
         learned_ids = set(
             ProfileAltProfessionData.objects.filter(
@@ -599,7 +480,7 @@ class ProfileAltProfessionDataView(viewsets.ModelViewSet):
         result = [
             [tier_name, sorted(cats.items())]
             for tier_name, cats in sorted(
-                tiers.items(), key=lambda x: _tier_sort_key(x[0]), reverse=True
+                tiers.items(), key=lambda x: tier_sort_key(x[0]), reverse=True
             )
         ]
 
@@ -626,13 +507,18 @@ class ProfileAltEquipmentView(viewsets.ModelViewSet):
         if user_id is None:
             return response.Response([])
 
+        if request.session.get("user_id") != user_id:
+            return response.Response([], status=403)
+
         alt_ids = ProfileAlt.objects.filter(user=user_id).values_list("alt_id", flat=True)
         queryset = (
             ProfileAltEquipment.objects.filter(alt__in=alt_ids)
             .select_related("alt")
             .order_by("-alt__alt_level")
         )
-        variants = DataEquipmentVariant.objects.all()
+        variant_map = {
+            (str(v.equipment_id), v.variant): v for v in DataEquipmentVariant.objects.all()
+        }
 
         if not fields or fields[0] == "":
             fields = [
@@ -671,7 +557,7 @@ class ProfileAltEquipmentView(viewsets.ModelViewSet):
                     raw = getattr(entry, field)
                     if raw != "0":
                         equip_id, variant_code = raw.split(":", 1)
-                        variant = variants.filter(equipment=equip_id, variant=variant_code).first()
+                        variant = variant_map.get((equip_id, variant_code))
                         level = variant.level if variant else 0
                     else:
                         level = 0
@@ -694,6 +580,9 @@ class ProfileAltEquipmentView(viewsets.ModelViewSet):
         alt = ProfileAlt.objects.filter(alt_name=alt_name, alt_realm_slug=realm_slug).first()
         if alt is None:
             return response.Response([])
+
+        if alt.user_id != request.session.get("user_id"):
+            return response.Response([], status=403)
 
         try:
             record = ProfileAltEquipment.objects.get(alt=alt)
@@ -721,14 +610,21 @@ class ProfileAltEquipmentView(viewsets.ModelViewSet):
             record.weapon2,
         ]
 
+        slot_pairs = [s.split(":", 1) if ":" in s else None for s in slot_values]
+        equip_ids = {p[0] for p in slot_pairs if p}
+        equip_map = {
+            str(e.equipment_id): e for e in DataEquipment.objects.filter(equipment_id__in=equip_ids)
+        }
+        variant_map = {
+            (str(v.equipment_id), v.variant): v
+            for v in DataEquipmentVariant.objects.filter(equipment_id__in=equip_ids)
+        }
+
         result = []
-        for slot in slot_values:
-            parts = slot.split(":", 1)
-            if len(parts) == 2:
-                equip_obj = DataEquipment.objects.filter(equipment_id=parts[0]).first()
-                variant_obj = DataEquipmentVariant.objects.filter(
-                    variant=parts[1], equipment=equip_obj
-                ).first()
+        for parts in slot_pairs:
+            if parts:
+                equip_obj = equip_map.get(parts[0])
+                variant_obj = variant_map.get((parts[0], parts[1]))
                 if equip_obj and variant_obj:
                     result.append([equip_obj.equipment_name, variant_obj.level])
                 else:
@@ -803,6 +699,8 @@ class BnetLogin(viewsets.ViewSet):
                     },
                 )
 
+        request.session["user_id"] = user_id
+
         return response.Response({"user": user_id, "alts": alt_ids})
 
 
@@ -811,13 +709,15 @@ class ScanAlt(viewsets.ViewSet):
         user_id = request.data.get("userid")
         if not user_id:
             return response.Response("nouser")
+        if request.session.get("user_id") != user_id:
+            return response.Response("forbidden", status=403)
         fullAltScan.delay(user_id, BLIZZ_CLIENT, BLIZZ_SECRET)
         return response.Response(timezone.now())
 
 
 class DataScan(viewsets.ViewSet):
+    permission_classes = [IsAdminUser]
+
     def create(self, request):
-        if request.data.get("password") != env("DATA_PASSWORD"):
-            return response.Response("Incorrect Password")
         fullDataScan.delay(BLIZZ_CLIENT, BLIZZ_SECRET)
-        return response.Response("Password Correct")
+        return response.Response("Scan started")
