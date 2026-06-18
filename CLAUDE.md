@@ -62,14 +62,22 @@ After changing `.env`, use `docker compose up -d web` (not `restart`) to pick up
 ## Project layout
 
 ```
-backend/          Django project config (settings, urls, celery, wsgi)
-apicore/          The single Django app
-  models.py       All DB models
-  views.py        All ViewSets + Lua file parser
-  tasks.py        Celery tasks (fullAltScan, fullDataScan)
-  serializers.py  DRF serializers
-  libs/           Helper mappings (keybind_mapping, icon_mapping)
-  migrations/     DB migrations
+backend/                Django project config (settings, urls, celery, wsgi)
+  test_settings.py      Overrides DB→SQLite and cache→locmem for pytest
+apicore/                The single Django app
+  models.py             All DB models
+  views.py              All ViewSets + Lua file parser
+  tasks.py              Celery tasks (fullAltScan, fullDataScan)
+  serializers.py        DRF serializers
+  permissions.py        IsSessionUser permission class
+  libs/
+    keybind_builder.py  Pure keybind-building logic (build_all/single_keybinds, tier_sort_key)
+    keybind_mapping.py  Slot→action-button mappings per addon
+    lua_parser.py       Hand-rolled Lua-table-to-JSON converter
+    icon_mapping.py     Mount/pet icon mappings
+  migrations/           DB migrations
+tests/                  pytest suite (47 tests); run via pytest tests/
+conftest.py             pytest env-var setup (pytest_configure hook)
 ```
 
 ## API URL structure

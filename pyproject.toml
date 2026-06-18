@@ -7,3 +7,14 @@ select = ["E", "F", "W", "I", "UP", "DJ"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["apicore"]
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "backend.test_settings"
+python_files = ["tests/test_*.py"]
+addopts = "--cov=apicore --cov-report=term-missing --cov-report=xml"
+
+[tool.coverage.run]
+omit = ["*/migrations/*", "*/libs/icon_mapping.py", "*/libs/mount_icons.py", "*/libs/race_mapping.py"]
+
+[tool.coverage.report]
+exclude_lines = ["pragma: no cover", "if TYPE_CHECKING:"]
