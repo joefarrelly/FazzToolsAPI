@@ -655,7 +655,9 @@ class ProfileAltEquipmentView(viewsets.ModelViewSet):
             .select_related("alt")
             .order_by("-alt__alt_level")
         )
-        variants = DataEquipmentVariant.objects.all()
+        variant_map = {
+            (str(v.equipment_id), v.variant): v for v in DataEquipmentVariant.objects.all()
+        }
 
         if not fields or fields[0] == "":
             fields = [
@@ -694,7 +696,7 @@ class ProfileAltEquipmentView(viewsets.ModelViewSet):
                     raw = getattr(entry, field)
                     if raw != "0":
                         equip_id, variant_code = raw.split(":", 1)
-                        variant = variants.filter(equipment=equip_id, variant=variant_code).first()
+                        variant = variant_map.get((equip_id, variant_code))
                         level = variant.level if variant else 0
                     else:
                         level = 0
@@ -747,14 +749,21 @@ class ProfileAltEquipmentView(viewsets.ModelViewSet):
             record.weapon2,
         ]
 
+        slot_pairs = [s.split(":", 1) if ":" in s else None for s in slot_values]
+        equip_ids = {p[0] for p in slot_pairs if p}
+        equip_map = {
+            str(e.equipment_id): e for e in DataEquipment.objects.filter(equipment_id__in=equip_ids)
+        }
+        variant_map = {
+            (str(v.equipment_id), v.variant): v
+            for v in DataEquipmentVariant.objects.filter(equipment_id__in=equip_ids)
+        }
+
         result = []
-        for slot in slot_values:
-            parts = slot.split(":", 1)
-            if len(parts) == 2:
-                equip_obj = DataEquipment.objects.filter(equipment_id=parts[0]).first()
-                variant_obj = DataEquipmentVariant.objects.filter(
-                    variant=parts[1], equipment=equip_obj
-                ).first()
+        for parts in slot_pairs:
+            if parts:
+                equip_obj = equip_map.get(parts[0])
+                variant_obj = variant_map.get((parts[0], parts[1]))
                 if equip_obj and variant_obj:
                     result.append([equip_obj.equipment_name, variant_obj.level])
                 else:
