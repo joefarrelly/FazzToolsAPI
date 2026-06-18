@@ -1,4 +1,4 @@
-name: Lint
+name: Lint and Test
 
 on:
   pull_request:
@@ -21,3 +21,43 @@ jobs:
         uses: astral-sh/ruff-action@0ce1b0bf8b818ef400413f810f8a11cdbda0034b  # v4.0.0
         with:
           args: "format --check"
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install system dependencies
+        run: sudo apt-get install -y default-libmysqlclient-dev build-essential pkg-config
+
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run tests with coverage
+        env:
+          SECRET_KEY: ci-secret-key-not-used-in-production
+          DEBUG_OPTION: "True"
+          DB_NAME: ci_db
+          DB_USER: ci_user
+          DB_PASSWORD: ci_pass
+          DB_HOST: localhost
+          DB_PORT: "3306"
+          FRONTEND_URL: http://localhost:3000
+          HASH_KEY: ci-hash-key-not-used-in-production
+          BLIZZ_CLIENT: ci-client
+          BLIZZ_SECRET: ci-secret
+          BLIZZ_REDIRECT_URI: http://localhost:3000/redirect/
+        run: python -m pytest tests/ -v
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          files: coverage.xml
+          token: ${{ secrets.CODECOV_TOKEN }}
