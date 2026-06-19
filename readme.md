@@ -5,7 +5,7 @@
 [![codecov](https://codecov.io/gh/joefarrelly/FazzToolsAPI/graph/badge.svg)](https://codecov.io/gh/joefarrelly/FazzToolsAPI)
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 
-**Frontend** [![Deploy](https://github.com/joefarrelly/FazzToolsFrontend/actions/workflows/deploy.yml/badge.svg)](https://github.com/joefarrelly/FazzToolsFrontend/actions/workflows/deploy.yml) [![Lint and Test](https://github.com/joefarrelly/FazzToolsFrontend/actions/workflows/lint.yml/badge.svg)](https://github.com/joefarrelly/FazzToolsFrontend/actions/workflows/lint.yml) | **Scraper** [![Lint](https://github.com/joefarrelly/FazzToolsScraper/actions/workflows/lint.yml/badge.svg)](https://github.com/joefarrelly/FazzToolsScraper/actions/workflows/lint.yml) [![Release](https://github.com/joefarrelly/FazzToolsScraper/actions/workflows/release.yml/badge.svg)](https://github.com/joefarrelly/FazzToolsScraper/actions/workflows/release.yml)
+**Suite:** [Backend](https://github.com/joefarrelly/FazzToolsAPI) · [Frontend](https://github.com/joefarrelly/FazzToolsFrontend) · [Addon](https://github.com/joefarrelly/FazzToolsScraper)
 
 Django REST Framework backend for **FazzTools** — a World of Warcraft companion app.
 
