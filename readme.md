@@ -5,6 +5,8 @@
 [![codecov](https://codecov.io/gh/joefarrelly/FazzToolsAPI/graph/badge.svg)](https://codecov.io/gh/joefarrelly/FazzToolsAPI)
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 
+**Frontend** [![Deploy](https://github.com/joefarrelly/FazzToolsFrontend/actions/workflows/deploy.yml/badge.svg)](https://github.com/joefarrelly/FazzToolsFrontend/actions/workflows/deploy.yml) [![Lint and Test](https://github.com/joefarrelly/FazzToolsFrontend/actions/workflows/lint.yml/badge.svg)](https://github.com/joefarrelly/FazzToolsFrontend/actions/workflows/lint.yml) | **Scraper** [![Lint](https://github.com/joefarrelly/FazzToolsScraper/actions/workflows/lint.yml/badge.svg)](https://github.com/joefarrelly/FazzToolsScraper/actions/workflows/lint.yml) [![Release](https://github.com/joefarrelly/FazzToolsScraper/actions/workflows/release.yml/badge.svg)](https://github.com/joefarrelly/FazzToolsScraper/actions/workflows/release.yml)
+
 Django REST Framework backend for **FazzTools** — a World of Warcraft companion app.
 
 Syncs character data (professions, equipment, mounts, pets) from the Blizzard Battle.net API and parses WoW Lua addon exports to serve keybind data.
