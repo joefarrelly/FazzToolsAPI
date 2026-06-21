@@ -106,6 +106,13 @@ CELERY_TASK_ROUTES = {
     "apicore.tasks.scan_single_alt": {"queue": "alt_scan"},
 }
 
+CELERY_BEAT_SCHEDULE = {
+    "purge-stale-profiles-daily": {
+        "task": "apicore.tasks.purge_stale_profiles",
+        "schedule": 86400,
+    },
+}
+
 REST_FRAMEWORK = {
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
     "PAGE_SIZE": 100,
