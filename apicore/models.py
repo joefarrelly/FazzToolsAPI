@@ -90,7 +90,7 @@ class DataEquipmentVariant(models.Model):
     equipment = models.ForeignKey(DataEquipment, on_delete=models.CASCADE)
     variant = models.CharField(max_length=64)
     stamina = models.PositiveSmallIntegerField()
-    armour = models.PositiveSmallIntegerField()
+    armor = models.PositiveSmallIntegerField()
     strength = models.PositiveSmallIntegerField()
     agility = models.PositiveSmallIntegerField()
     intellect = models.PositiveSmallIntegerField()

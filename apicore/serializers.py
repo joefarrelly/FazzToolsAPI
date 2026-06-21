@@ -69,7 +69,7 @@ class DataEquipmentVariantSerializer(serializers.HyperlinkedModelSerializer):
             "equipment",
             "variant",
             "stamina",
-            "armour",
+            "armor",
             "strength",
             "agility",
             "intellect",
