@@ -90,7 +90,17 @@ _STAT_FIELDS = {
 }
 
 _session = requests.Session()
-_session.mount("https://", HTTPAdapter(max_retries=Retry(total=3, backoff_factor=1)))
+_session.mount(
+    "https://",
+    HTTPAdapter(
+        max_retries=Retry(
+            total=5,
+            backoff_factor=1,
+            status_forcelist=[429, 500, 502, 503, 504],
+            allowed_methods=["HEAD", "GET", "POST"],
+        )
+    ),
+)
 
 
 # ---------------------------------------------------------------------------
@@ -129,35 +139,47 @@ def fullAltScan(user_id: str, client: str, secret: str) -> None:
     group(scan_single_alt.s(alt_id, user_id, token) for alt_id in alt_ids).apply_async()
 
 
-@shared_task
-def scan_single_alt(alt_id: int, user_id: str, token: str) -> None:
-    alt = ProfileAlt.objects.get(alt_id=alt_id)
-    user = ProfileUser.objects.get(user_id=user_id)
-    auth_headers = {"Authorization": f"Bearer {token}"}
+@shared_task(bind=True)
+def scan_single_alt(self, alt_id: int, user_id: str, token: str) -> None:
+    try:
+        alt = ProfileAlt.objects.get(alt_id=alt_id)
+        user = ProfileUser.objects.get(user_id=user_id)
+        auth_headers = {"Authorization": f"Bearer {token}"}
 
-    char_base = f"{_EU_API_BASE}/profile/wow/character/{alt.alt_realm_slug}/{alt.alt_name.lower()}"
-    endpoints = {
-        "professions": f"{char_base}/professions",
-        "equipment": f"{char_base}/equipment",
-        "mounts": f"{char_base}/collections/mounts",
-        "pets": f"{char_base}/collections/pets",
-    }
+        char_base = (
+            f"{_EU_API_BASE}/profile/wow/character/{alt.alt_realm_slug}/{alt.alt_name.lower()}"
+        )
+        endpoints = {
+            "professions": f"{char_base}/professions",
+            "equipment": f"{char_base}/equipment",
+            "mounts": f"{char_base}/collections/mounts",
+            "pets": f"{char_base}/collections/pets",
+        }
 
-    for key, url in endpoints.items():
-        resp = _api_get(url, _PROFILE_PARAMS, auth_headers)
-        if resp.status_code != 200:
-            logger.warning("Blizzard API %s %s", resp.status_code, url)
-            continue
-        if key == "professions":
-            _sync_professions(alt, resp.json(), auth_headers)
-        elif key == "equipment":
-            _sync_equipment(alt, resp.json())
-        elif key == "mounts":
-            _sync_mounts(user, resp.json())
-        elif key == "pets":
-            _sync_pets(user, resp.json())
+        for key, url in endpoints.items():
+            resp = _api_get(url, _PROFILE_PARAMS, auth_headers)
+            if resp.status_code != 200:
+                logger.warning("Blizzard API %s %s", resp.status_code, url)
+                continue
+            if key == "professions":
+                _sync_professions(alt, resp.json(), auth_headers)
+            elif key == "equipment":
+                _sync_equipment(alt, resp.json())
+            elif key == "mounts":
+                _sync_mounts(user, resp.json())
+            elif key == "pets":
+                _sync_pets(user, resp.json())
 
-    logger.info("Completed alt scan: %s-%s", alt.alt_name, alt.alt_realm_slug)
+        logger.info("Completed alt scan: %s-%s", alt.alt_name, alt.alt_realm_slug)
+    except Exception as exc:
+        logger.error(
+            "scan_single_alt failed: alt_id=%s user_id=%s task_id=%s error=%s",
+            alt_id,
+            user_id,
+            self.request.id,
+            exc,
+        )
+        raise
 
 
 def _sync_professions(alt: ProfileAlt, data: dict, auth_headers: dict) -> None:
@@ -595,3 +617,30 @@ def _sync_pet_data(index_data: dict, auth_headers: dict) -> None:
             )
         except (KeyError, TypeError) as exc:
             logger.warning("Failed to parse pet: %s", exc)
+
+
+# ---------------------------------------------------------------------------
+# Maintenance — purge stale profile data
+# ---------------------------------------------------------------------------
+
+
+@shared_task
+def purge_stale_profiles() -> None:
+    now = timezone.now()
+    prof_data_deleted, _ = ProfileAltProfessionData.objects.filter(
+        alt_profession_data_expiry_date__lt=now
+    ).delete()
+    prof_deleted, _ = ProfileAltProfession.objects.filter(
+        alt_profession_expiry_date__lt=now
+    ).delete()
+    equip_deleted, _ = ProfileAltEquipment.objects.filter(
+        alt_equipment_expiry_date__lt=now
+    ).delete()
+    alt_deleted, _ = ProfileAlt.objects.filter(alt_expiry_date__lt=now).delete()
+    logger.info(
+        "purge_stale_profiles: deleted %d profession_data, %d professions, %d equipment, %d alts",
+        prof_data_deleted,
+        prof_deleted,
+        equip_deleted,
+        alt_deleted,
+    )
