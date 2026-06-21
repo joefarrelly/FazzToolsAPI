@@ -320,14 +320,14 @@ def _sync_equipment(alt: ProfileAlt, data: dict) -> None:
 
 def _parse_item_stats(item: dict) -> dict:
     defaults = {v: 0 for v in _STAT_FIELDS.values()}
-    defaults["armour"] = 0
+    defaults["armor"] = 0
 
     for stat in item.get("stats", []):
         field = _STAT_FIELDS.get(stat.get("type", {}).get("type", ""))
         if field:
             defaults[field] = stat.get("value", 0)
 
-    defaults["armour"] = item.get("armor", {}).get("value", 0)
+    defaults["armor"] = item.get("armor", {}).get("value", 0)
     defaults["level"] = item.get("level", {}).get("value", 0)
     defaults["quality"] = item.get("quality", {}).get("name", "")
     return defaults
