@@ -329,6 +329,7 @@ class DataAchievement(models.Model):
 class DataFaction(models.Model):
     faction_id = models.PositiveIntegerField(primary_key=True)
     faction_name = models.CharField(max_length=256)
+    faction_category = models.CharField(max_length=128, default="")
 
     class Meta:
         db_table = "ft_data_faction"

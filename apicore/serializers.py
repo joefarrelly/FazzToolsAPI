@@ -221,6 +221,7 @@ class DataFactionSerializer(serializers.ModelSerializer):
 
 
 class ProfileAltAchievementSerializer(serializers.ModelSerializer):
+    alt_name = serializers.ReadOnlyField(source="alt.alt_name")
     achievement_name = serializers.ReadOnlyField(source="achievement.achievement_name")
     achievement_points = serializers.ReadOnlyField(source="achievement.achievement_points")
     achievement_category = serializers.ReadOnlyField(source="achievement.achievement_category")
@@ -229,6 +230,7 @@ class ProfileAltAchievementSerializer(serializers.ModelSerializer):
         model = ProfileAltAchievement
         fields = (
             "alt",
+            "alt_name",
             "achievement",
             "achievement_name",
             "achievement_points",
@@ -238,14 +240,18 @@ class ProfileAltAchievementSerializer(serializers.ModelSerializer):
 
 
 class ProfileAltReputationSerializer(serializers.ModelSerializer):
+    alt_name = serializers.ReadOnlyField(source="alt.alt_name")
     faction_name = serializers.ReadOnlyField(source="faction.faction_name")
+    faction_category = serializers.ReadOnlyField(source="faction.faction_category")
 
     class Meta:
         model = ProfileAltReputation
         fields = (
             "alt",
+            "alt_name",
             "faction",
             "faction_name",
+            "faction_category",
             "standing_type",
             "standing_value",
         )

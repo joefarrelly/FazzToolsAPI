@@ -738,6 +738,8 @@ class ProfileAltAchievementView(viewsets.ModelViewSet):
         user_id = request.query_params.get("user")
         alt_name = request.query_params.get("alt", "").title()
         realm_slug = request.query_params.get("realm", "")
+        summary = request.query_params.get("summary")
+        category = request.query_params.get("category")
 
         if not user_id:
             return response.Response([])
@@ -757,12 +759,57 @@ class ProfileAltAchievementView(viewsets.ModelViewSet):
             )
         else:
             alt_ids = ProfileAlt.objects.filter(user=user_id).values_list("alt_id", flat=True)
-            qs = (
-                ProfileAltAchievement.objects.filter(alt__in=alt_ids)
-                .select_related("alt", "achievement")
-                .order_by("alt__alt_name", "-completed_timestamp")
+            qs = ProfileAltAchievement.objects.filter(alt__in=alt_ids).select_related(
+                "alt", "achievement"
             )
 
+        # Distinct earned achievement IDs for this user — eliminates duplicates
+        # that arise when the same achievement is stored against multiple alts
+        # (e.g. old per-alt scans before scan_user_collection was introduced).
+        earned_ids = qs.values_list("achievement_id", flat=True).distinct()
+
+        if summary:
+            data = (
+                DataAchievement.objects.filter(achievement_id__in=earned_ids)
+                .values("achievement_category")
+                .annotate(
+                    count=models.Count("pk"),
+                    points=models.Sum("achievement_points"),
+                )
+                .order_by("achievement_category")
+            )
+            return response.Response(
+                [
+                    {
+                        "category_name": r["achievement_category"],
+                        "count": r["count"],
+                        "points": r["points"],
+                    }
+                    for r in data
+                ]
+            )
+
+        if category:
+            achievements = DataAchievement.objects.filter(
+                achievement_id__in=earned_ids,
+                achievement_category=category,
+            ).order_by("achievement_name")
+            return response.Response(
+                [
+                    {
+                        "achievement": a.achievement_id,
+                        "alt": None,
+                        "alt_name": None,
+                        "achievement_name": a.achievement_name,
+                        "achievement_points": a.achievement_points,
+                        "achievement_category": a.achievement_category,
+                        "completed_timestamp": None,
+                    }
+                    for a in achievements
+                ]
+            )
+
+        qs = qs.order_by("achievement__achievement_name")
         serializer = self.get_serializer(qs, many=True)
         return response.Response(serializer.data)
 
