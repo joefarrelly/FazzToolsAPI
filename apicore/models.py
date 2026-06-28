@@ -206,6 +206,7 @@ class ProfileAlt(models.Model):
     alt_id = models.PositiveIntegerField(primary_key=True)
     alt_account_id = models.PositiveIntegerField()
     alt_level = models.PositiveSmallIntegerField()
+    alt_ilvl = models.PositiveSmallIntegerField(default=0)
     alt_name = models.CharField(max_length=64)
     alt_realm = models.CharField(max_length=64)
     alt_realm_id = models.PositiveSmallIntegerField()
@@ -356,7 +357,7 @@ class ProfileAltReputation(models.Model):
     alt = models.ForeignKey(ProfileAlt, on_delete=models.CASCADE)
     faction = models.ForeignKey(DataFaction, on_delete=models.CASCADE)
     standing_type = models.CharField(max_length=32)
-    standing_value = models.PositiveIntegerField()
+    standing_value = models.IntegerField()
     alt_reputation_expiry_date = models.DateTimeField()
 
     class Meta:

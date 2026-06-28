@@ -48,7 +48,13 @@ data.register(r"factions", views.DataFactionView)
 custom = routers.DefaultRouter()
 custom.register(r"bnetlogin", views.BnetLogin, "bnetlogin")
 custom.register(r"scanalt", views.ScanAlt, "scanalt")
+custom.register(r"logout", views.Logout, "logout")
 custom.register(r"datascan", views.DataScan, "datascan")
+custom.register(r"datascan/professions", views.DataScanProfessions, "datascanprofessions")
+custom.register(r"datascan/mounts", views.DataScanMounts, "datascanmounts")
+custom.register(r"datascan/pets", views.DataScanPets, "datascanpets")
+custom.register(r"datascan/achievements", views.DataScanAchievements, "datscanachievements")
+custom.register(r"datascan/factions", views.DataScanFactions, "datascanfactions")
 # custom.register(r'fileupload', views.FileUpload, 'fileupload')
 
 urlpatterns = [

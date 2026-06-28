@@ -141,24 +141,27 @@ def fullAltScan(user_id: str, client: str, secret: str) -> None:
     ProfileUser.objects.filter(user_id=user_id).update(user_last_update=timezone.now())
     logger.info("Dispatching %d alt scan tasks for user %s", len(alt_ids), user_id)
     group(scan_single_alt.s(alt_id, user_id, token) for alt_id in alt_ids).apply_async()
+    scan_user_collection.delay(user_id, token)
 
 
 @shared_task(bind=True)
 def scan_single_alt(self, alt_id: int, user_id: str, token: str) -> None:
     try:
         alt = ProfileAlt.objects.get(alt_id=alt_id)
-        user = ProfileUser.objects.get(user_id=user_id)
         auth_headers = {"Authorization": f"Bearer {token}"}
 
         char_base = (
             f"{_EU_API_BASE}/profile/wow/character/{alt.alt_realm_slug}/{alt.alt_name.lower()}"
         )
+
+        summary_resp = _api_get(char_base, _PROFILE_PARAMS, auth_headers)
+        if summary_resp.status_code == 200:
+            ilvl = summary_resp.json().get("equipped_item_level", 0)
+            ProfileAlt.objects.filter(alt_id=alt_id).update(alt_ilvl=ilvl)
+
         endpoints = {
             "professions": f"{char_base}/professions",
             "equipment": f"{char_base}/equipment",
-            "mounts": f"{char_base}/collections/mounts",
-            "pets": f"{char_base}/collections/pets",
-            "achievements": f"{char_base}/achievements",
             "reputations": f"{char_base}/reputations",
         }
 
@@ -171,12 +174,6 @@ def scan_single_alt(self, alt_id: int, user_id: str, token: str) -> None:
                 _sync_professions(alt, resp.json(), auth_headers)
             elif key == "equipment":
                 _sync_equipment(alt, resp.json())
-            elif key == "mounts":
-                _sync_mounts(user, resp.json())
-            elif key == "pets":
-                _sync_pets(user, resp.json())
-            elif key == "achievements":
-                _sync_achievements(alt, resp.json())
             elif key == "reputations":
                 _sync_reputations(alt, resp.json())
 
@@ -189,6 +186,52 @@ def scan_single_alt(self, alt_id: int, user_id: str, token: str) -> None:
             self.request.id,
             exc,
         )
+        raise
+
+
+@shared_task
+def scan_user_collection(user_id: str, token: str) -> None:
+    """Fetch account-wide data (mounts, pets, achievements) from one alt per faction."""
+    try:
+        user = ProfileUser.objects.get(user_id=user_id)
+        auth_headers = {"Authorization": f"Bearer {token}"}
+
+        alts_by_faction: dict[str, ProfileAlt] = {}
+        for alt in ProfileAlt.objects.filter(user=user_id).order_by("-alt_level", "-alt_ilvl"):
+            faction = alt.alt_faction.upper()
+            if faction not in alts_by_faction:
+                alts_by_faction[faction] = alt
+            if len(alts_by_faction) >= 2:
+                break
+
+        for faction, alt in alts_by_faction.items():
+            char_base = (
+                f"{_EU_API_BASE}/profile/wow/character/{alt.alt_realm_slug}/{alt.alt_name.lower()}"
+            )
+            for endpoint, key in [
+                (f"{char_base}/collections/mounts", "mounts"),
+                (f"{char_base}/collections/pets", "pets"),
+                (f"{char_base}/achievements", "achievements"),
+            ]:
+                resp = _api_get(endpoint, _PROFILE_PARAMS, auth_headers)
+                if resp.status_code != 200:
+                    logger.warning("Blizzard API %s %s", resp.status_code, endpoint)
+                    continue
+                if key == "mounts":
+                    _sync_mounts(user, resp.json())
+                elif key == "pets":
+                    _sync_pets(user, resp.json())
+                elif key == "achievements":
+                    _sync_achievements(alt, resp.json())
+
+            logger.info(
+                "Completed collection scan for %s faction via %s-%s",
+                faction,
+                alt.alt_name,
+                alt.alt_realm_slug,
+            )
+    except Exception as exc:
+        logger.error("scan_user_collection failed: user_id=%s error=%s", user_id, exc)
         raise
 
 
@@ -378,33 +421,73 @@ def _sync_pets(user: ProfileUser, data: dict) -> None:
 
 @shared_task
 def fullDataScan(client: str, secret: str) -> str:
+    scanProfessionData.delay(client, secret)
+    scanMountData.delay(client, secret)
+    scanPetData.delay(client, secret)
+    scanAchievementData.delay(client, secret)
+    scanFactionData.delay(client, secret)
+    return "Dispatched all data scans"
+
+
+@shared_task
+def scanProfessionData(client: str, secret: str) -> str:
     token = _fetch_token(client, secret)
     auth_headers = {"Authorization": f"Bearer {token}"}
+    resp = _api_get(f"{_EU_API_BASE}/data/wow/profession/index", _STATIC_PARAMS, auth_headers)
+    if resp.status_code != 200:
+        logger.error("Blizzard API %s profession/index", resp.status_code)
+        return "Failed"
+    _sync_profession_data(resp.json(), auth_headers)
+    return "Done"
 
-    index_urls = [
-        f"{_EU_API_BASE}/data/wow/profession/index",
-        f"{_EU_API_BASE}/data/wow/mount/index",
-        f"{_EU_API_BASE}/data/wow/pet/index",
-        f"{_EU_API_BASE}/data/wow/achievement/index",
-        f"{_EU_API_BASE}/data/wow/reputation-faction/index",
-    ]
 
-    for url in index_urls:
-        resp = _api_get(url, _STATIC_PARAMS, auth_headers)
-        if resp.status_code != 200:
-            logger.error("Blizzard API %s %s", resp.status_code, url)
-            continue
-        if "profession" in url:
-            _sync_profession_data(resp.json(), auth_headers)
-        elif "mount" in url:
-            _sync_mount_data(resp.json(), auth_headers)
-        elif "pet" in url:
-            _sync_pet_data(resp.json(), auth_headers)
-        elif "achievement" in url:
-            _sync_achievement_data(resp.json(), auth_headers)
-        elif "reputation-faction" in url:
-            _sync_faction_data(resp.json())
+@shared_task
+def scanMountData(client: str, secret: str) -> str:
+    token = _fetch_token(client, secret)
+    auth_headers = {"Authorization": f"Bearer {token}"}
+    resp = _api_get(f"{_EU_API_BASE}/data/wow/mount/index", _STATIC_PARAMS, auth_headers)
+    if resp.status_code != 200:
+        logger.error("Blizzard API %s mount/index", resp.status_code)
+        return "Failed"
+    _sync_mount_data(resp.json(), auth_headers)
+    return "Done"
 
+
+@shared_task
+def scanPetData(client: str, secret: str) -> str:
+    token = _fetch_token(client, secret)
+    auth_headers = {"Authorization": f"Bearer {token}"}
+    resp = _api_get(f"{_EU_API_BASE}/data/wow/pet/index", _STATIC_PARAMS, auth_headers)
+    if resp.status_code != 200:
+        logger.error("Blizzard API %s pet/index", resp.status_code)
+        return "Failed"
+    _sync_pet_data(resp.json(), auth_headers)
+    return "Done"
+
+
+@shared_task
+def scanAchievementData(client: str, secret: str) -> str:
+    token = _fetch_token(client, secret)
+    auth_headers = {"Authorization": f"Bearer {token}"}
+    resp = _api_get(f"{_EU_API_BASE}/data/wow/achievement/index", _STATIC_PARAMS, auth_headers)
+    if resp.status_code != 200:
+        logger.error("Blizzard API %s achievement/index", resp.status_code)
+        return "Failed"
+    _sync_achievement_data(resp.json(), auth_headers)
+    return "Done"
+
+
+@shared_task
+def scanFactionData(client: str, secret: str) -> str:
+    token = _fetch_token(client, secret)
+    auth_headers = {"Authorization": f"Bearer {token}"}
+    resp = _api_get(
+        f"{_EU_API_BASE}/data/wow/reputation-faction/index", _STATIC_PARAMS, auth_headers
+    )
+    if resp.status_code != 200:
+        logger.error("Blizzard API %s reputation-faction/index", resp.status_code)
+        return "Failed"
+    _sync_faction_data(resp.json())
     return "Done"
 
 

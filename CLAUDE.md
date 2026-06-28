@@ -96,16 +96,26 @@ conftest.py             pytest env-var setup (pytest_configure hook)
 - `altprofessiondatas` — `ProfileAltProfessionData`: Known recipes per alt/profession
 - `altequipments` — `ProfileAltEquipment`: Equipped gear slots per alt
 - `usermounts` / `userpets` — Collected mounts/pets per user
+- `altachievements` — `ProfileAltAchievement`: Achievement completions per alt
+- `altreputations` — `ProfileAltReputation`: Faction standing per alt
 
 ### Data endpoints (static WoW data, synced via DataScan task)
 - `professions`, `professiontiers`, `professionrecipes`, `reagents`, `recipereagents`
 - `equipments`, `equipmentvariants`
 - `mounts`, `pets`
+- `achievements` — `DataAchievement`: All WoW achievements (name, points, category)
+- `factions` — `DataFaction`: All WoW reputation factions
 
 ### Custom endpoints
 - `POST /api/custom/bnetlogin/` — Battle.net OAuth2 callback; creates/updates user and syncs alts
+- `POST /api/custom/logout/` — Flushes Django session and removes auth state
 - `POST /api/custom/scanalt/` — Triggers `fullAltScan` Celery task for a user
-- `POST /api/custom/datascan/` — Triggers `fullDataScan` Celery task (Django admin user required)
+- `POST /api/custom/datascan/` — Triggers all data scans (Django admin required)
+- `POST /api/custom/datascan/professions/` — Triggers profession data scan only
+- `POST /api/custom/datascan/mounts/` — Triggers mount data scan only
+- `POST /api/custom/datascan/pets/` — Triggers pet data scan only
+- `POST /api/custom/datascan/achievements/` — Triggers achievement data scan only
+- `POST /api/custom/datascan/factions/` — Triggers faction data scan only
 
 ## Key data flows
 
@@ -113,14 +123,22 @@ conftest.py             pytest env-var setup (pytest_configure hook)
 `BnetLogin.create` → exchanges auth code for token (using `Authorization: Bearer` header) → fetches WoW profile → HMAC-hashes Blizzard user ID → upserts `ProfileUser` and all `ProfileAlt` records.
 
 ### Alt scan (`fullAltScan` Celery task)
-For each alt belonging to a user, fetches from Blizzard API:
-1. `/professions` → upserts `ProfileAltProfession` + `ProfileAltProfessionData` (creates missing `DataProfessionRecipe` entries on the fly)
-2. `/equipment` → upserts `ProfileAltEquipment` + `DataEquipment` / `DataEquipmentVariant`
-3. `/collections/mounts` → links known `DataMount` records to user via `ProfileUserMount`
-4. `/collections/pets` → links known `DataPet` records to user via `ProfileUserPet`
+Dispatches two sets of tasks in parallel:
+
+**Per-alt** (`scan_single_alt` × N alts):
+1. Character summary → updates `ProfileAlt.alt_ilvl` (equipped item level)
+2. `/professions` → upserts `ProfileAltProfession` + `ProfileAltProfessionData`
+3. `/equipment` → upserts `ProfileAltEquipment` + `DataEquipment` / `DataEquipmentVariant`
+4. `/reputations` → upserts `ProfileAltReputation` per faction
+
+**Per-user** (`scan_user_collection` × 1):
+Picks the highest-level, highest-ilvl alt per faction (Alliance + Horde) and fetches:
+- `/collections/mounts` → links known `DataMount` to user via `ProfileUserMount`
+- `/collections/pets` → links known `DataPet` to user via `ProfileUserPet`
+- `/achievements` → upserts `ProfileAltAchievement` for that representative alt
 
 ### Data scan (`fullDataScan` Celery task)
-Fetches Blizzard static data API indexes and walks all professions (tiers → categories → recipes → reagents) and all mounts/pets, creating `Data*` records.
+Dispatches five independent subtasks: `scanProfessionData`, `scanMountData`, `scanPetData`, `scanAchievementData`, `scanFactionData`. Each can also be triggered individually via its own endpoint.
 
 ### Lua keybind file
 `ProfileUser.perform_update` validates and stores a `FazzToolsScraper.lua` addon export.  
@@ -128,9 +146,9 @@ Fetches Blizzard static data API indexes and walks all professions (tiers → ca
 
 ## Database tables (all prefixed `ft_`)
 
-**Data (static):** `ft_data_profession`, `ft_data_professiontier`, `ft_data_professionrecipe`, `ft_data_reagent`, `ft_data_recipereagent`, `ft_data_equipment`, `ft_data_equipmentvariant`, `ft_data_mount`, `ft_data_pet`
+**Data (static):** `ft_data_profession`, `ft_data_professiontier`, `ft_data_professionrecipe`, `ft_data_reagent`, `ft_data_recipereagent`, `ft_data_equipment`, `ft_data_equipmentvariant`, `ft_data_mount`, `ft_data_pet`, `ft_data_achievement`, `ft_data_faction`
 
-**Profile (user):** `ft_profile_user`, `ft_profile_alt`, `ft_profile_altprofession`, `ft_profile_altprofessiondata`, `ft_profile_altequipment`, `ft_profile_usermount`, `ft_profile_userpet`
+**Profile (user):** `ft_profile_user`, `ft_profile_alt`, `ft_profile_altprofession`, `ft_profile_altprofessiondata`, `ft_profile_altequipment`, `ft_profile_usermount`, `ft_profile_userpet`, `ft_profile_altachievement`, `ft_profile_altreputation`
 
 ## Things to know
 

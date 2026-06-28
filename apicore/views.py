@@ -65,7 +65,15 @@ from apicore.serializers import (
     ProfileUserPetSerializer,
     ProfileUserSerializer,
 )
-from apicore.tasks import fullAltScan, fullDataScan
+from apicore.tasks import (
+    fullAltScan,
+    fullDataScan,
+    scanAchievementData,
+    scanFactionData,
+    scanMountData,
+    scanPetData,
+    scanProfessionData,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -807,9 +815,55 @@ class ScanAlt(viewsets.ViewSet):
         return response.Response(timezone.now())
 
 
+class Logout(viewsets.ViewSet):
+    def create(self, request):
+        request.session.flush()
+        return response.Response("ok")
+
+
 class DataScan(viewsets.ViewSet):
     permission_classes = [IsAdminUser]
 
     def create(self, request):
         fullDataScan.delay(BLIZZ_CLIENT, BLIZZ_SECRET)
         return response.Response("Scan started")
+
+
+class DataScanProfessions(viewsets.ViewSet):
+    permission_classes = [IsAdminUser]
+
+    def create(self, request):
+        scanProfessionData.delay(BLIZZ_CLIENT, BLIZZ_SECRET)
+        return response.Response("Profession scan started")
+
+
+class DataScanMounts(viewsets.ViewSet):
+    permission_classes = [IsAdminUser]
+
+    def create(self, request):
+        scanMountData.delay(BLIZZ_CLIENT, BLIZZ_SECRET)
+        return response.Response("Mount scan started")
+
+
+class DataScanPets(viewsets.ViewSet):
+    permission_classes = [IsAdminUser]
+
+    def create(self, request):
+        scanPetData.delay(BLIZZ_CLIENT, BLIZZ_SECRET)
+        return response.Response("Pet scan started")
+
+
+class DataScanAchievements(viewsets.ViewSet):
+    permission_classes = [IsAdminUser]
+
+    def create(self, request):
+        scanAchievementData.delay(BLIZZ_CLIENT, BLIZZ_SECRET)
+        return response.Response("Achievement scan started")
+
+
+class DataScanFactions(viewsets.ViewSet):
+    permission_classes = [IsAdminUser]
+
+    def create(self, request):
+        scanFactionData.delay(BLIZZ_CLIENT, BLIZZ_SECRET)
+        return response.Response("Faction scan started")
