@@ -8,6 +8,7 @@ from django.utils import timezone
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
+from apicore.libs.faction_expansion import FACTION_EXPANSION
 from apicore.libs.mount_icons import MOUNT_ICONS
 from apicore.models import (
     DataAchievement,
@@ -793,16 +794,21 @@ def _sync_reputations(alt: ProfileAlt, data: dict) -> None:
             faction_id = faction_ref.get("id")
             if not faction_id:
                 continue
-            faction, _ = DataFaction.objects.get_or_create(
-                faction_id=faction_id,
-                defaults={"faction_name": faction_ref.get("name", "Unknown")},
-            )
             standing = rep_data.get("standing", {})
+            if not standing:
+                continue
+            faction, _ = DataFaction.objects.update_or_create(
+                faction_id=faction_id,
+                defaults={
+                    "faction_name": faction_ref.get("name", "Unknown"),
+                    "faction_category": FACTION_EXPANSION.get(faction_id, ""),
+                },
+            )
             ProfileAltReputation.objects.update_or_create(
                 alt=alt,
                 faction=faction,
                 defaults={
-                    "standing_type": standing.get("type", ""),
+                    "standing_type": standing.get("name", ""),
                     "standing_value": standing.get("raw", 0),
                     "alt_reputation_expiry_date": expiry,
                 },
@@ -817,7 +823,12 @@ def _sync_reputations(alt: ProfileAlt, data: dict) -> None:
 
 
 def _sync_achievement_data(index_data: dict, auth_headers: dict) -> None:
-    for ach_ref in index_data.get("achievements", []):
+    achievements = index_data.get("achievements", [])
+    total = len(achievements)
+    logger.info("Achievement scan: %d achievements to process", total)
+    for i, ach_ref in enumerate(achievements, 1):
+        if i % 100 == 0 or i == total:
+            logger.info("Achievement scan: %d/%d", i, total)
         resp = _api_get(ach_ref["key"]["href"], _STATIC_PARAMS, auth_headers)
         if resp.status_code != 200:
             logger.warning("Blizzard API %s %s", resp.status_code, ach_ref["key"]["href"])
@@ -834,6 +845,7 @@ def _sync_achievement_data(index_data: dict, auth_headers: dict) -> None:
             )
         except (KeyError, TypeError) as exc:
             logger.warning("Failed to parse achievement %s: %s", ach_ref.get("id"), exc)
+    logger.info("Achievement scan complete")
 
 
 def _sync_faction_data(index_data: dict) -> None:

@@ -71,10 +71,11 @@ apicore/                The single Django app
   serializers.py        DRF serializers
   permissions.py        IsSessionUser permission class
   libs/
-    keybind_builder.py  Pure keybind-building logic (build_all/single_keybinds, tier_sort_key)
-    keybind_mapping.py  Slot→action-button mappings per addon
-    lua_parser.py       Hand-rolled Lua-table-to-JSON converter
-    icon_mapping.py     Mount/pet icon mappings
+    keybind_builder.py    Pure keybind-building logic (build_all/single_keybinds, tier_sort_key)
+    keybind_mapping.py    Slot→action-button mappings per addon
+    lua_parser.py         Hand-rolled Lua-table-to-JSON converter
+    icon_mapping.py       Mount/pet icon mappings
+    faction_expansion.py  Hardcoded faction_id → expansion name mapping (283 factions)
   migrations/           DB migrations
 tests/                  pytest suite (47 tests); run via pytest tests/
 conftest.py             pytest env-var setup (pytest_configure hook)
