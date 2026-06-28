@@ -21,8 +21,10 @@ from urllib3.util.retry import Retry
 from apicore.libs.keybind_builder import build_all_keybinds, build_single_keybinds, tier_sort_key
 from apicore.libs.lua_parser import LuaParser
 from apicore.models import (
+    DataAchievement,
     DataEquipment,
     DataEquipmentVariant,
+    DataFaction,
     DataMount,
     DataPet,
     DataProfession,
@@ -31,17 +33,21 @@ from apicore.models import (
     DataReagent,
     DataRecipeReagent,
     ProfileAlt,
+    ProfileAltAchievement,
     ProfileAltEquipment,
     ProfileAltProfession,
     ProfileAltProfessionData,
+    ProfileAltReputation,
     ProfileUser,
     ProfileUserMount,
     ProfileUserPet,
 )
 from apicore.permissions import IsSessionUser
 from apicore.serializers import (
+    DataAchievementSerializer,
     DataEquipmentSerializer,
     DataEquipmentVariantSerializer,
+    DataFactionSerializer,
     DataMountSerializer,
     DataPetSerializer,
     DataProfessionRecipeSerializer,
@@ -49,15 +55,25 @@ from apicore.serializers import (
     DataProfessionTierSerializer,
     DataReagentSerializer,
     DataRecipeReagentSerializer,
+    ProfileAltAchievementSerializer,
     ProfileAltEquipmentSerializer,
     ProfileAltProfessionDataSerializer,
     ProfileAltProfessionSerializer,
+    ProfileAltReputationSerializer,
     ProfileAltSerializer,
     ProfileUserMountSerializer,
     ProfileUserPetSerializer,
     ProfileUserSerializer,
 )
-from apicore.tasks import fullAltScan, fullDataScan
+from apicore.tasks import (
+    fullAltScan,
+    fullDataScan,
+    scanAchievementData,
+    scanFactionData,
+    scanMountData,
+    scanPetData,
+    scanProfessionData,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -704,6 +720,90 @@ class BnetLogin(viewsets.ViewSet):
         return response.Response({"user": user_id, "alts": alt_ids})
 
 
+class DataAchievementView(viewsets.ModelViewSet):
+    serializer_class = DataAchievementSerializer
+    queryset = DataAchievement.objects.all()
+
+
+class DataFactionView(viewsets.ModelViewSet):
+    serializer_class = DataFactionSerializer
+    queryset = DataFaction.objects.all()
+
+
+class ProfileAltAchievementView(viewsets.ModelViewSet):
+    serializer_class = ProfileAltAchievementSerializer
+    queryset = ProfileAltAchievement.objects.all()
+
+    def list(self, request):
+        user_id = request.query_params.get("user")
+        alt_name = request.query_params.get("alt", "").title()
+        realm_slug = request.query_params.get("realm", "")
+
+        if not user_id:
+            return response.Response([])
+        if request.session.get("user_id") != user_id:
+            return response.Response([], status=403)
+
+        if alt_name and realm_slug:
+            alt = ProfileAlt.objects.filter(
+                alt_name=alt_name, alt_realm_slug=realm_slug, user=user_id
+            ).first()
+            if not alt:
+                return response.Response([])
+            qs = (
+                ProfileAltAchievement.objects.filter(alt=alt)
+                .select_related("achievement")
+                .order_by("-completed_timestamp")
+            )
+        else:
+            alt_ids = ProfileAlt.objects.filter(user=user_id).values_list("alt_id", flat=True)
+            qs = (
+                ProfileAltAchievement.objects.filter(alt__in=alt_ids)
+                .select_related("alt", "achievement")
+                .order_by("alt__alt_name", "-completed_timestamp")
+            )
+
+        serializer = self.get_serializer(qs, many=True)
+        return response.Response(serializer.data)
+
+
+class ProfileAltReputationView(viewsets.ModelViewSet):
+    serializer_class = ProfileAltReputationSerializer
+    queryset = ProfileAltReputation.objects.all()
+
+    def list(self, request):
+        user_id = request.query_params.get("user")
+        alt_name = request.query_params.get("alt", "").title()
+        realm_slug = request.query_params.get("realm", "")
+
+        if not user_id:
+            return response.Response([])
+        if request.session.get("user_id") != user_id:
+            return response.Response([], status=403)
+
+        if alt_name and realm_slug:
+            alt = ProfileAlt.objects.filter(
+                alt_name=alt_name, alt_realm_slug=realm_slug, user=user_id
+            ).first()
+            if not alt:
+                return response.Response([])
+            qs = (
+                ProfileAltReputation.objects.filter(alt=alt)
+                .select_related("faction")
+                .order_by("-standing_value")
+            )
+        else:
+            alt_ids = ProfileAlt.objects.filter(user=user_id).values_list("alt_id", flat=True)
+            qs = (
+                ProfileAltReputation.objects.filter(alt__in=alt_ids)
+                .select_related("alt", "faction")
+                .order_by("alt__alt_name", "-standing_value")
+            )
+
+        serializer = self.get_serializer(qs, many=True)
+        return response.Response(serializer.data)
+
+
 class ScanAlt(viewsets.ViewSet):
     def create(self, request):
         user_id = request.data.get("userid")
@@ -715,9 +815,55 @@ class ScanAlt(viewsets.ViewSet):
         return response.Response(timezone.now())
 
 
+class Logout(viewsets.ViewSet):
+    def create(self, request):
+        request.session.flush()
+        return response.Response("ok")
+
+
 class DataScan(viewsets.ViewSet):
     permission_classes = [IsAdminUser]
 
     def create(self, request):
         fullDataScan.delay(BLIZZ_CLIENT, BLIZZ_SECRET)
         return response.Response("Scan started")
+
+
+class DataScanProfessions(viewsets.ViewSet):
+    permission_classes = [IsAdminUser]
+
+    def create(self, request):
+        scanProfessionData.delay(BLIZZ_CLIENT, BLIZZ_SECRET)
+        return response.Response("Profession scan started")
+
+
+class DataScanMounts(viewsets.ViewSet):
+    permission_classes = [IsAdminUser]
+
+    def create(self, request):
+        scanMountData.delay(BLIZZ_CLIENT, BLIZZ_SECRET)
+        return response.Response("Mount scan started")
+
+
+class DataScanPets(viewsets.ViewSet):
+    permission_classes = [IsAdminUser]
+
+    def create(self, request):
+        scanPetData.delay(BLIZZ_CLIENT, BLIZZ_SECRET)
+        return response.Response("Pet scan started")
+
+
+class DataScanAchievements(viewsets.ViewSet):
+    permission_classes = [IsAdminUser]
+
+    def create(self, request):
+        scanAchievementData.delay(BLIZZ_CLIENT, BLIZZ_SECRET)
+        return response.Response("Achievement scan started")
+
+
+class DataScanFactions(viewsets.ViewSet):
+    permission_classes = [IsAdminUser]
+
+    def create(self, request):
+        scanFactionData.delay(BLIZZ_CLIENT, BLIZZ_SECRET)
+        return response.Response("Faction scan started")

@@ -25,3 +25,7 @@ __pycache__/
 *.pyo
 coverage.xml
 .coverage
+
+# Celery
+celerybeat-schedule
+celerybeat.pid

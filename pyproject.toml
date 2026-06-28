@@ -1,6 +1,7 @@
 [tool.ruff]
 target-version = "py312"
 line-length = 100
+exclude = ["apicore/migrations/*"]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "UP", "DJ"]
