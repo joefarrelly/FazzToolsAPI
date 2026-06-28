@@ -21,8 +21,10 @@ from urllib3.util.retry import Retry
 from apicore.libs.keybind_builder import build_all_keybinds, build_single_keybinds, tier_sort_key
 from apicore.libs.lua_parser import LuaParser
 from apicore.models import (
+    DataAchievement,
     DataEquipment,
     DataEquipmentVariant,
+    DataFaction,
     DataMount,
     DataPet,
     DataProfession,
@@ -31,17 +33,21 @@ from apicore.models import (
     DataReagent,
     DataRecipeReagent,
     ProfileAlt,
+    ProfileAltAchievement,
     ProfileAltEquipment,
     ProfileAltProfession,
     ProfileAltProfessionData,
+    ProfileAltReputation,
     ProfileUser,
     ProfileUserMount,
     ProfileUserPet,
 )
 from apicore.permissions import IsSessionUser
 from apicore.serializers import (
+    DataAchievementSerializer,
     DataEquipmentSerializer,
     DataEquipmentVariantSerializer,
+    DataFactionSerializer,
     DataMountSerializer,
     DataPetSerializer,
     DataProfessionRecipeSerializer,
@@ -49,9 +55,11 @@ from apicore.serializers import (
     DataProfessionTierSerializer,
     DataReagentSerializer,
     DataRecipeReagentSerializer,
+    ProfileAltAchievementSerializer,
     ProfileAltEquipmentSerializer,
     ProfileAltProfessionDataSerializer,
     ProfileAltProfessionSerializer,
+    ProfileAltReputationSerializer,
     ProfileAltSerializer,
     ProfileUserMountSerializer,
     ProfileUserPetSerializer,
@@ -702,6 +710,90 @@ class BnetLogin(viewsets.ViewSet):
         request.session["user_id"] = user_id
 
         return response.Response({"user": user_id, "alts": alt_ids})
+
+
+class DataAchievementView(viewsets.ModelViewSet):
+    serializer_class = DataAchievementSerializer
+    queryset = DataAchievement.objects.all()
+
+
+class DataFactionView(viewsets.ModelViewSet):
+    serializer_class = DataFactionSerializer
+    queryset = DataFaction.objects.all()
+
+
+class ProfileAltAchievementView(viewsets.ModelViewSet):
+    serializer_class = ProfileAltAchievementSerializer
+    queryset = ProfileAltAchievement.objects.all()
+
+    def list(self, request):
+        user_id = request.query_params.get("user")
+        alt_name = request.query_params.get("alt", "").title()
+        realm_slug = request.query_params.get("realm", "")
+
+        if not user_id:
+            return response.Response([])
+        if request.session.get("user_id") != user_id:
+            return response.Response([], status=403)
+
+        if alt_name and realm_slug:
+            alt = ProfileAlt.objects.filter(
+                alt_name=alt_name, alt_realm_slug=realm_slug, user=user_id
+            ).first()
+            if not alt:
+                return response.Response([])
+            qs = (
+                ProfileAltAchievement.objects.filter(alt=alt)
+                .select_related("achievement")
+                .order_by("-completed_timestamp")
+            )
+        else:
+            alt_ids = ProfileAlt.objects.filter(user=user_id).values_list("alt_id", flat=True)
+            qs = (
+                ProfileAltAchievement.objects.filter(alt__in=alt_ids)
+                .select_related("alt", "achievement")
+                .order_by("alt__alt_name", "-completed_timestamp")
+            )
+
+        serializer = self.get_serializer(qs, many=True)
+        return response.Response(serializer.data)
+
+
+class ProfileAltReputationView(viewsets.ModelViewSet):
+    serializer_class = ProfileAltReputationSerializer
+    queryset = ProfileAltReputation.objects.all()
+
+    def list(self, request):
+        user_id = request.query_params.get("user")
+        alt_name = request.query_params.get("alt", "").title()
+        realm_slug = request.query_params.get("realm", "")
+
+        if not user_id:
+            return response.Response([])
+        if request.session.get("user_id") != user_id:
+            return response.Response([], status=403)
+
+        if alt_name and realm_slug:
+            alt = ProfileAlt.objects.filter(
+                alt_name=alt_name, alt_realm_slug=realm_slug, user=user_id
+            ).first()
+            if not alt:
+                return response.Response([])
+            qs = (
+                ProfileAltReputation.objects.filter(alt=alt)
+                .select_related("faction")
+                .order_by("-standing_value")
+            )
+        else:
+            alt_ids = ProfileAlt.objects.filter(user=user_id).values_list("alt_id", flat=True)
+            qs = (
+                ProfileAltReputation.objects.filter(alt__in=alt_ids)
+                .select_related("alt", "faction")
+                .order_by("alt__alt_name", "-standing_value")
+            )
+
+        serializer = self.get_serializer(qs, many=True)
+        return response.Response(serializer.data)
 
 
 class ScanAlt(viewsets.ViewSet):

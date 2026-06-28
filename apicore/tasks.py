@@ -10,8 +10,10 @@ from urllib3.util.retry import Retry
 
 from apicore.libs.mount_icons import MOUNT_ICONS
 from apicore.models import (
+    DataAchievement,
     DataEquipment,
     DataEquipmentVariant,
+    DataFaction,
     DataMount,
     DataPet,
     DataProfession,
@@ -20,9 +22,11 @@ from apicore.models import (
     DataReagent,
     DataRecipeReagent,
     ProfileAlt,
+    ProfileAltAchievement,
     ProfileAltEquipment,
     ProfileAltProfession,
     ProfileAltProfessionData,
+    ProfileAltReputation,
     ProfileUser,
     ProfileUserMount,
     ProfileUserPet,
@@ -154,6 +158,8 @@ def scan_single_alt(self, alt_id: int, user_id: str, token: str) -> None:
             "equipment": f"{char_base}/equipment",
             "mounts": f"{char_base}/collections/mounts",
             "pets": f"{char_base}/collections/pets",
+            "achievements": f"{char_base}/achievements",
+            "reputations": f"{char_base}/reputations",
         }
 
         for key, url in endpoints.items():
@@ -169,6 +175,10 @@ def scan_single_alt(self, alt_id: int, user_id: str, token: str) -> None:
                 _sync_mounts(user, resp.json())
             elif key == "pets":
                 _sync_pets(user, resp.json())
+            elif key == "achievements":
+                _sync_achievements(alt, resp.json())
+            elif key == "reputations":
+                _sync_reputations(alt, resp.json())
 
         logger.info("Completed alt scan: %s-%s", alt.alt_name, alt.alt_realm_slug)
     except Exception as exc:
@@ -375,6 +385,8 @@ def fullDataScan(client: str, secret: str) -> str:
         f"{_EU_API_BASE}/data/wow/profession/index",
         f"{_EU_API_BASE}/data/wow/mount/index",
         f"{_EU_API_BASE}/data/wow/pet/index",
+        f"{_EU_API_BASE}/data/wow/achievement/index",
+        f"{_EU_API_BASE}/data/wow/reputation-faction/index",
     ]
 
     for url in index_urls:
@@ -388,6 +400,10 @@ def fullDataScan(client: str, secret: str) -> str:
             _sync_mount_data(resp.json(), auth_headers)
         elif "pet" in url:
             _sync_pet_data(resp.json(), auth_headers)
+        elif "achievement" in url:
+            _sync_achievement_data(resp.json(), auth_headers)
+        elif "reputation-faction" in url:
+            _sync_faction_data(resp.json())
 
     return "Done"
 
@@ -636,11 +652,113 @@ def purge_stale_profiles() -> None:
     equip_deleted, _ = ProfileAltEquipment.objects.filter(
         alt_equipment_expiry_date__lt=now
     ).delete()
+    ach_deleted, _ = ProfileAltAchievement.objects.filter(
+        alt_achievement_expiry_date__lt=now
+    ).delete()
+    rep_deleted, _ = ProfileAltReputation.objects.filter(
+        alt_reputation_expiry_date__lt=now
+    ).delete()
     alt_deleted, _ = ProfileAlt.objects.filter(alt_expiry_date__lt=now).delete()
     logger.info(
-        "purge_stale_profiles: deleted %d profession_data, %d professions, %d equipment, %d alts",
+        "purge_stale_profiles: deleted %d profession_data, %d professions, %d equipment, "
+        "%d achievements, %d reputations, %d alts",
         prof_data_deleted,
         prof_deleted,
         equip_deleted,
+        ach_deleted,
+        rep_deleted,
         alt_deleted,
     )
+
+
+# ---------------------------------------------------------------------------
+# Per-alt sync helpers — achievements + reputations
+# ---------------------------------------------------------------------------
+
+
+def _sync_achievements(alt: ProfileAlt, data: dict) -> None:
+    expiry = timezone.now() + datetime.timedelta(days=30)
+    for ach_data in data.get("achievements", []):
+        try:
+            ach_ref = ach_data.get("achievement", {})
+            ach_id = ach_ref.get("id") or ach_data.get("id")
+            if not ach_id:
+                continue
+            achievement, _ = DataAchievement.objects.get_or_create(
+                achievement_id=ach_id,
+                defaults={"achievement_name": ach_ref.get("name", "Unknown")},
+            )
+            ts = ach_data.get("completed_timestamp")
+            completed = timezone.datetime.fromtimestamp(ts / 1000, tz=datetime.UTC) if ts else None
+            ProfileAltAchievement.objects.update_or_create(
+                alt=alt,
+                achievement=achievement,
+                defaults={
+                    "completed_timestamp": completed,
+                    "alt_achievement_expiry_date": expiry,
+                },
+            )
+        except (KeyError, TypeError) as exc:
+            logger.warning("Failed to sync achievement for %s: %s", alt.alt_name, exc)
+
+
+def _sync_reputations(alt: ProfileAlt, data: dict) -> None:
+    expiry = timezone.now() + datetime.timedelta(days=30)
+    for rep_data in data.get("reputations", []):
+        try:
+            faction_ref = rep_data.get("faction", {})
+            faction_id = faction_ref.get("id")
+            if not faction_id:
+                continue
+            faction, _ = DataFaction.objects.get_or_create(
+                faction_id=faction_id,
+                defaults={"faction_name": faction_ref.get("name", "Unknown")},
+            )
+            standing = rep_data.get("standing", {})
+            ProfileAltReputation.objects.update_or_create(
+                alt=alt,
+                faction=faction,
+                defaults={
+                    "standing_type": standing.get("type", ""),
+                    "standing_value": standing.get("raw", 0),
+                    "alt_reputation_expiry_date": expiry,
+                },
+            )
+        except (KeyError, TypeError) as exc:
+            logger.warning("Failed to sync reputation for %s: %s", alt.alt_name, exc)
+
+
+# ---------------------------------------------------------------------------
+# Static data sync helpers — achievements + factions
+# ---------------------------------------------------------------------------
+
+
+def _sync_achievement_data(index_data: dict, auth_headers: dict) -> None:
+    for ach_ref in index_data.get("achievements", []):
+        resp = _api_get(ach_ref["key"]["href"], _STATIC_PARAMS, auth_headers)
+        if resp.status_code != 200:
+            logger.warning("Blizzard API %s %s", resp.status_code, ach_ref["key"]["href"])
+            continue
+        try:
+            details = resp.json()
+            DataAchievement.objects.update_or_create(
+                achievement_id=details["id"],
+                defaults={
+                    "achievement_name": details["name"],
+                    "achievement_points": details.get("points", 0),
+                    "achievement_category": details.get("category", {}).get("name", ""),
+                },
+            )
+        except (KeyError, TypeError) as exc:
+            logger.warning("Failed to parse achievement %s: %s", ach_ref.get("id"), exc)
+
+
+def _sync_faction_data(index_data: dict) -> None:
+    for faction_ref in index_data.get("factions", []):
+        try:
+            DataFaction.objects.get_or_create(
+                faction_id=faction_ref["id"],
+                defaults={"faction_name": faction_ref["name"]},
+            )
+        except (KeyError, TypeError) as exc:
+            logger.warning("Failed to parse faction %s: %s", faction_ref.get("id"), exc)

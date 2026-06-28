@@ -310,3 +310,60 @@ class ProfileAltEquipment(models.Model):
 
     def __str__(self):
         return f"{self.alt.alt_name} - {self.alt.alt_realm}"
+
+
+class DataAchievement(models.Model):
+    achievement_id = models.PositiveIntegerField(primary_key=True)
+    achievement_name = models.CharField(max_length=256)
+    achievement_points = models.PositiveSmallIntegerField(default=0)
+    achievement_category = models.CharField(max_length=128, default="")
+
+    class Meta:
+        db_table = "ft_data_achievement"
+
+    def __str__(self):
+        return f"{self.achievement_id} - {self.achievement_name}"
+
+
+class DataFaction(models.Model):
+    faction_id = models.PositiveIntegerField(primary_key=True)
+    faction_name = models.CharField(max_length=256)
+
+    class Meta:
+        db_table = "ft_data_faction"
+
+    def __str__(self):
+        return f"{self.faction_id} - {self.faction_name}"
+
+
+class ProfileAltAchievement(models.Model):
+    alt = models.ForeignKey(ProfileAlt, on_delete=models.CASCADE)
+    achievement = models.ForeignKey(DataAchievement, on_delete=models.CASCADE)
+    completed_timestamp = models.DateTimeField(null=True, blank=True)
+    alt_achievement_expiry_date = models.DateTimeField()
+
+    class Meta:
+        db_table = "ft_profile_altachievement"
+        constraints = [
+            models.UniqueConstraint(fields=["alt", "achievement"], name="unique_altachievement")
+        ]
+
+    def __str__(self):
+        return f"{self.alt} - {self.achievement}"
+
+
+class ProfileAltReputation(models.Model):
+    alt = models.ForeignKey(ProfileAlt, on_delete=models.CASCADE)
+    faction = models.ForeignKey(DataFaction, on_delete=models.CASCADE)
+    standing_type = models.CharField(max_length=32)
+    standing_value = models.PositiveIntegerField()
+    alt_reputation_expiry_date = models.DateTimeField()
+
+    class Meta:
+        db_table = "ft_profile_altreputation"
+        constraints = [
+            models.UniqueConstraint(fields=["alt", "faction"], name="unique_altreputation")
+        ]
+
+    def __str__(self):
+        return f"{self.alt} - {self.faction}"

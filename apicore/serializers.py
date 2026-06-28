@@ -1,8 +1,10 @@
 from rest_framework import serializers
 
 from apicore.models import (
+    DataAchievement,
     DataEquipment,
     DataEquipmentVariant,
+    DataFaction,
     DataMount,
     DataPet,
     DataProfession,
@@ -11,9 +13,11 @@ from apicore.models import (
     DataReagent,
     DataRecipeReagent,
     ProfileAlt,
+    ProfileAltAchievement,
     ProfileAltEquipment,
     ProfileAltProfession,
     ProfileAltProfessionData,
+    ProfileAltReputation,
     ProfileUser,
     ProfileUserMount,
     ProfileUserPet,
@@ -196,4 +200,52 @@ class ProfileAltEquipmentSerializer(serializers.ModelSerializer):
             "weapon1",
             "weapon2",
             "alt_equipment_expiry_date",
+        )
+
+
+class DataAchievementSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = DataAchievement
+        fields = (
+            "achievement_id",
+            "achievement_name",
+            "achievement_points",
+            "achievement_category",
+        )
+
+
+class DataFactionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = DataFaction
+        fields = ("faction_id", "faction_name")
+
+
+class ProfileAltAchievementSerializer(serializers.ModelSerializer):
+    achievement_name = serializers.ReadOnlyField(source="achievement.achievement_name")
+    achievement_points = serializers.ReadOnlyField(source="achievement.achievement_points")
+    achievement_category = serializers.ReadOnlyField(source="achievement.achievement_category")
+
+    class Meta:
+        model = ProfileAltAchievement
+        fields = (
+            "alt",
+            "achievement",
+            "achievement_name",
+            "achievement_points",
+            "achievement_category",
+            "completed_timestamp",
+        )
+
+
+class ProfileAltReputationSerializer(serializers.ModelSerializer):
+    faction_name = serializers.ReadOnlyField(source="faction.faction_name")
+
+    class Meta:
+        model = ProfileAltReputation
+        fields = (
+            "alt",
+            "faction",
+            "faction_name",
+            "standing_type",
+            "standing_value",
         )
