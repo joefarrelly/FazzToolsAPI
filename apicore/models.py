@@ -369,3 +369,46 @@ class ProfileAltReputation(models.Model):
 
     def __str__(self):
         return f"{self.alt} - {self.faction}"
+
+
+class DataMythicDungeon(models.Model):
+    dungeon_id = models.PositiveIntegerField(primary_key=True)
+    dungeon_name = models.CharField(max_length=256)
+
+    class Meta:
+        db_table = "ft_data_mythicdungeon"
+
+    def __str__(self):
+        return f"{self.dungeon_id} - {self.dungeon_name}"
+
+
+class ProfileAltMythicPlus(models.Model):
+    alt = models.OneToOneField(ProfileAlt, on_delete=models.CASCADE, primary_key=True)
+    season_id = models.PositiveIntegerField()
+    mythic_rating = models.FloatField(default=0)
+    alt_mythicplus_expiry_date = models.DateTimeField()
+
+    class Meta:
+        db_table = "ft_profile_altmythicplus"
+
+    def __str__(self):
+        return f"{self.alt.alt_name} - {self.alt.alt_realm}"
+
+
+class ProfileAltMythicPlusDungeon(models.Model):
+    alt = models.ForeignKey(ProfileAltMythicPlus, on_delete=models.CASCADE)
+    dungeon = models.ForeignKey(DataMythicDungeon, on_delete=models.CASCADE)
+    keystone_level = models.PositiveSmallIntegerField(default=0)
+    score = models.FloatField(default=0)
+    completed_timestamp = models.DateTimeField(null=True, blank=True)
+    is_completed_within_time = models.BooleanField(default=False)
+    alt_mythicplusdungeon_expiry_date = models.DateTimeField()
+
+    class Meta:
+        db_table = "ft_profile_altmythicplusdungeon"
+        constraints = [
+            models.UniqueConstraint(fields=["alt", "dungeon"], name="unique_altmythicplusdungeon")
+        ]
+
+    def __str__(self):
+        return f"{self.alt} - {self.dungeon}"

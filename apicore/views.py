@@ -26,6 +26,7 @@ from apicore.models import (
     DataEquipmentVariant,
     DataFaction,
     DataMount,
+    DataMythicDungeon,
     DataPet,
     DataProfession,
     DataProfessionRecipe,
@@ -35,6 +36,8 @@ from apicore.models import (
     ProfileAlt,
     ProfileAltAchievement,
     ProfileAltEquipment,
+    ProfileAltMythicPlus,
+    ProfileAltMythicPlusDungeon,
     ProfileAltProfession,
     ProfileAltProfessionData,
     ProfileAltReputation,
@@ -49,6 +52,7 @@ from apicore.serializers import (
     DataEquipmentVariantSerializer,
     DataFactionSerializer,
     DataMountSerializer,
+    DataMythicDungeonSerializer,
     DataPetSerializer,
     DataProfessionRecipeSerializer,
     DataProfessionSerializer,
@@ -57,6 +61,8 @@ from apicore.serializers import (
     DataRecipeReagentSerializer,
     ProfileAltAchievementSerializer,
     ProfileAltEquipmentSerializer,
+    ProfileAltMythicPlusDungeonSerializer,
+    ProfileAltMythicPlusSerializer,
     ProfileAltProfessionDataSerializer,
     ProfileAltProfessionSerializer,
     ProfileAltReputationSerializer,
@@ -71,6 +77,7 @@ from apicore.tasks import (
     scanAchievementData,
     scanFactionData,
     scanMountData,
+    scanMythicDungeonData,
     scanPetData,
     scanProfessionData,
 )
@@ -721,6 +728,11 @@ class DataFactionView(viewsets.ModelViewSet):
     queryset = DataFaction.objects.all()
 
 
+class DataMythicDungeonView(viewsets.ModelViewSet):
+    serializer_class = DataMythicDungeonSerializer
+    queryset = DataMythicDungeon.objects.all()
+
+
 class ProfileAltAchievementView(viewsets.ModelViewSet):
     serializer_class = ProfileAltAchievementSerializer
     queryset = ProfileAltAchievement.objects.all()
@@ -842,6 +854,76 @@ class ProfileAltReputationView(viewsets.ModelViewSet):
         return response.Response(serializer.data)
 
 
+class ProfileAltMythicPlusView(viewsets.ModelViewSet):
+    serializer_class = ProfileAltMythicPlusSerializer
+    queryset = ProfileAltMythicPlus.objects.all()
+
+    def list(self, request):
+        user_id = request.query_params.get("user")
+        alt_name = request.query_params.get("alt", "").title()
+        realm_slug = request.query_params.get("realm", "")
+
+        if not user_id:
+            return response.Response([])
+        if request.session.get("user_id") != user_id:
+            return response.Response([], status=403)
+
+        if alt_name and realm_slug:
+            alt = ProfileAlt.objects.filter(
+                alt_name=alt_name, alt_realm_slug=realm_slug, user=user_id
+            ).first()
+            if not alt:
+                return response.Response([])
+            qs = ProfileAltMythicPlus.objects.filter(alt=alt)
+        else:
+            alt_ids = ProfileAlt.objects.filter(user=user_id).values_list("alt_id", flat=True)
+            qs = (
+                ProfileAltMythicPlus.objects.filter(alt__in=alt_ids)
+                .select_related("alt")
+                .order_by("-mythic_rating")
+            )
+
+        serializer = self.get_serializer(qs, many=True)
+        return response.Response(serializer.data)
+
+
+class ProfileAltMythicPlusDungeonView(viewsets.ModelViewSet):
+    serializer_class = ProfileAltMythicPlusDungeonSerializer
+    queryset = ProfileAltMythicPlusDungeon.objects.all()
+
+    def list(self, request):
+        user_id = request.query_params.get("user")
+        alt_name = request.query_params.get("alt", "").title()
+        realm_slug = request.query_params.get("realm", "")
+
+        if not user_id:
+            return response.Response([])
+        if request.session.get("user_id") != user_id:
+            return response.Response([], status=403)
+
+        if alt_name and realm_slug:
+            alt = ProfileAlt.objects.filter(
+                alt_name=alt_name, alt_realm_slug=realm_slug, user=user_id
+            ).first()
+            if not alt:
+                return response.Response([])
+            qs = (
+                ProfileAltMythicPlusDungeon.objects.filter(alt__alt=alt)
+                .select_related("dungeon")
+                .order_by("-score")
+            )
+        else:
+            alt_ids = ProfileAlt.objects.filter(user=user_id).values_list("alt_id", flat=True)
+            qs = (
+                ProfileAltMythicPlusDungeon.objects.filter(alt__alt__in=alt_ids)
+                .select_related("alt", "dungeon")
+                .order_by("alt__alt__alt_name", "-score")
+            )
+
+        serializer = self.get_serializer(qs, many=True)
+        return response.Response(serializer.data)
+
+
 class ScanAlt(viewsets.ViewSet):
     def create(self, request):
         user_id = request.data.get("userid")
@@ -911,3 +993,12 @@ class DataScanFactions(viewsets.ViewSet):
     def create(self, request):
         scanFactionData.delay(BLIZZ_CLIENT, BLIZZ_SECRET)
         return response.Response("Faction scan started")
+
+
+class DataScanMythicDungeons(viewsets.ViewSet):
+    authentication_classes = [SessionAuthentication]
+    permission_classes = [IsAdminUser]
+
+    def create(self, request):
+        scanMythicDungeonData.delay(BLIZZ_CLIENT, BLIZZ_SECRET)
+        return response.Response("Mythic dungeon scan started")

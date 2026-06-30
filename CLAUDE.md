@@ -98,6 +98,8 @@ conftest.py             pytest env-var setup (pytest_configure hook)
 - `usermounts` / `userpets` — Collected mounts/pets per user
 - `altachievements` — `ProfileAltAchievement`: Achievement completions per alt
 - `altreputations` — `ProfileAltReputation`: Faction standing per alt
+- `altmythicplus` — `ProfileAltMythicPlus`: Current-season M+ rating summary per alt
+- `altmythicplusdungeons` — `ProfileAltMythicPlusDungeon`: Best run per dungeon per alt
 
 ### Data endpoints (static WoW data, synced via DataScan task)
 - `professions`, `professiontiers`, `professionrecipes`, `reagents`, `recipereagents`
@@ -105,6 +107,7 @@ conftest.py             pytest env-var setup (pytest_configure hook)
 - `mounts`, `pets`
 - `achievements` — `DataAchievement`: All WoW achievements (name, points, category)
 - `factions` — `DataFaction`: All WoW reputation factions
+- `mythicdungeons` — `DataMythicDungeon`: All Mythic+ dungeons (current and historical)
 
 ### Custom endpoints
 - `POST /api/custom/bnetlogin/` — Battle.net OAuth2 callback; creates/updates user and syncs alts
@@ -116,6 +119,7 @@ conftest.py             pytest env-var setup (pytest_configure hook)
 - `POST /api/custom/datascan/pets/` — Triggers pet data scan only
 - `POST /api/custom/datascan/achievements/` — Triggers achievement data scan only
 - `POST /api/custom/datascan/factions/` — Triggers faction data scan only
+- `POST /api/custom/datascan/mythicdungeons/` — Triggers Mythic+ dungeon catalog scan only
 
 ## Key data flows
 
@@ -130,6 +134,7 @@ Dispatches two sets of tasks in parallel:
 2. `/professions` → upserts `ProfileAltProfession` + `ProfileAltProfessionData`
 3. `/equipment` → upserts `ProfileAltEquipment` + `DataEquipment` / `DataEquipmentVariant`
 4. `/reputations` → upserts `ProfileAltReputation` per faction
+5. `/mythic-keystone-profile` → upserts `ProfileAltMythicPlus` + `ProfileAltMythicPlusDungeon`. The main endpoint only lists season refs (no rating/runs) — the season id isn't flagged as "current" anywhere, so `max(season.id)` is used to pick it, then a second call to `/mythic-keystone-profile/season/{id}` fetches `mythic_rating` and `best_runs`. Blizzard can list two `best_runs` entries per dungeon (best-timed and best-overall, same `map_rating` but different `keystone_level`) — the sync keeps the higher level.
 
 **Per-user** (`scan_user_collection` × 1):
 Picks the highest-level, highest-ilvl alt per faction (Alliance + Horde) and fetches:
@@ -138,7 +143,7 @@ Picks the highest-level, highest-ilvl alt per faction (Alliance + Horde) and fet
 - `/achievements` → upserts `ProfileAltAchievement` for that representative alt
 
 ### Data scan (`fullDataScan` Celery task)
-Dispatches five independent subtasks: `scanProfessionData`, `scanMountData`, `scanPetData`, `scanAchievementData`, `scanFactionData`. Each can also be triggered individually via its own endpoint.
+Dispatches six independent subtasks: `scanProfessionData`, `scanMountData`, `scanPetData`, `scanAchievementData`, `scanFactionData`, `scanMythicDungeonData`. Each can also be triggered individually via its own endpoint. The dungeon index requires `namespace=dynamic-eu` (not `static-eu` like other catalogs).
 
 ### Lua addon file
 `ProfileUser.perform_update` validates and stores a `FazzToolsScraper.lua` addon export.
@@ -146,9 +151,9 @@ Dispatches five independent subtasks: `scanProfessionData`, `scanMountData`, `sc
 
 ## Database tables (all prefixed `ft_`)
 
-**Data (static):** `ft_data_profession`, `ft_data_professiontier`, `ft_data_professionrecipe`, `ft_data_reagent`, `ft_data_recipereagent`, `ft_data_equipment`, `ft_data_equipmentvariant`, `ft_data_mount`, `ft_data_pet`, `ft_data_achievement`, `ft_data_faction`
+**Data (static):** `ft_data_profession`, `ft_data_professiontier`, `ft_data_professionrecipe`, `ft_data_reagent`, `ft_data_recipereagent`, `ft_data_equipment`, `ft_data_equipmentvariant`, `ft_data_mount`, `ft_data_pet`, `ft_data_achievement`, `ft_data_faction`, `ft_data_mythicdungeon`
 
-**Profile (user):** `ft_profile_user`, `ft_profile_alt`, `ft_profile_altprofession`, `ft_profile_altprofessiondata`, `ft_profile_altequipment`, `ft_profile_usermount`, `ft_profile_userpet`, `ft_profile_altachievement`, `ft_profile_altreputation`
+**Profile (user):** `ft_profile_user`, `ft_profile_alt`, `ft_profile_altprofession`, `ft_profile_altprofessiondata`, `ft_profile_altequipment`, `ft_profile_usermount`, `ft_profile_userpet`, `ft_profile_altachievement`, `ft_profile_altreputation`, `ft_profile_altmythicplus`, `ft_profile_altmythicplusdungeon`
 
 ## Things to know
 

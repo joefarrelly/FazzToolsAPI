@@ -6,6 +6,7 @@ from apicore.models import (
     DataEquipmentVariant,
     DataFaction,
     DataMount,
+    DataMythicDungeon,
     DataPet,
     DataProfession,
     DataProfessionRecipe,
@@ -15,6 +16,8 @@ from apicore.models import (
     ProfileAlt,
     ProfileAltAchievement,
     ProfileAltEquipment,
+    ProfileAltMythicPlus,
+    ProfileAltMythicPlusDungeon,
     ProfileAltProfession,
     ProfileAltProfessionData,
     ProfileAltReputation,
@@ -254,4 +257,34 @@ class ProfileAltReputationSerializer(serializers.ModelSerializer):
             "faction_category",
             "standing_type",
             "standing_value",
+        )
+
+
+class DataMythicDungeonSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = DataMythicDungeon
+        fields = ("dungeon_id", "dungeon_name")
+
+
+class ProfileAltMythicPlusSerializer(serializers.ModelSerializer):
+    alt_name = serializers.ReadOnlyField(source="alt.alt_name")
+
+    class Meta:
+        model = ProfileAltMythicPlus
+        fields = ("alt", "alt_name", "season_id", "mythic_rating")
+
+
+class ProfileAltMythicPlusDungeonSerializer(serializers.ModelSerializer):
+    dungeon_name = serializers.ReadOnlyField(source="dungeon.dungeon_name")
+
+    class Meta:
+        model = ProfileAltMythicPlusDungeon
+        fields = (
+            "alt",
+            "dungeon",
+            "dungeon_name",
+            "keystone_level",
+            "score",
+            "completed_timestamp",
+            "is_completed_within_time",
         )

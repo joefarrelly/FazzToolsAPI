@@ -16,6 +16,7 @@ from apicore.models import (
     DataEquipmentVariant,
     DataFaction,
     DataMount,
+    DataMythicDungeon,
     DataPet,
     DataProfession,
     DataProfessionRecipe,
@@ -25,6 +26,8 @@ from apicore.models import (
     ProfileAlt,
     ProfileAltAchievement,
     ProfileAltEquipment,
+    ProfileAltMythicPlus,
+    ProfileAltMythicPlusDungeon,
     ProfileAltProfession,
     ProfileAltProfessionData,
     ProfileAltReputation,
@@ -39,6 +42,7 @@ _EU_TOKEN_URL = "https://eu.battle.net/oauth/token"
 _EU_API_BASE = "https://eu.api.blizzard.com"
 _PROFILE_PARAMS = {"namespace": "profile-eu", "locale": "en_US"}
 _STATIC_PARAMS = {"namespace": "static-eu", "locale": "en_US"}
+_DYNAMIC_PARAMS = {"namespace": "dynamic-eu", "locale": "en_US"}
 _LOCALE_PARAMS = {"locale": "en_US"}
 
 _EQUIPMENT_SLOTS = [
@@ -177,6 +181,8 @@ def scan_single_alt(self, alt_id: int, user_id: str, token: str) -> None:
                 _sync_equipment(alt, resp.json())
             elif key == "reputations":
                 _sync_reputations(alt, resp.json())
+
+        _sync_mythic_plus(alt, char_base, auth_headers)
 
         logger.info("Completed alt scan: %s-%s", alt.alt_name, alt.alt_realm_slug)
     except Exception as exc:
@@ -427,6 +433,7 @@ def fullDataScan(client: str, secret: str) -> str:
     scanPetData.delay(client, secret)
     scanAchievementData.delay(client, secret)
     scanFactionData.delay(client, secret)
+    scanMythicDungeonData.delay(client, secret)
     return "Dispatched all data scans"
 
 
@@ -489,6 +496,20 @@ def scanFactionData(client: str, secret: str) -> str:
         logger.error("Blizzard API %s reputation-faction/index", resp.status_code)
         return "Failed"
     _sync_faction_data(resp.json())
+    return "Done"
+
+
+@shared_task
+def scanMythicDungeonData(client: str, secret: str) -> str:
+    token = _fetch_token(client, secret)
+    auth_headers = {"Authorization": f"Bearer {token}"}
+    resp = _api_get(
+        f"{_EU_API_BASE}/data/wow/mythic-keystone/dungeon/index", _DYNAMIC_PARAMS, auth_headers
+    )
+    if resp.status_code != 200:
+        logger.error("Blizzard API %s mythic-keystone/dungeon/index", resp.status_code)
+        return "Failed"
+    _sync_mythic_dungeon_data(resp.json())
     return "Done"
 
 
@@ -817,6 +838,70 @@ def _sync_reputations(alt: ProfileAlt, data: dict) -> None:
             logger.warning("Failed to sync reputation for %s: %s", alt.alt_name, exc)
 
 
+def _sync_mythic_plus(alt: ProfileAlt, char_base: str, auth_headers: dict) -> None:
+    resp = _api_get(f"{char_base}/mythic-keystone-profile", _PROFILE_PARAMS, auth_headers)
+    if resp.status_code != 200:
+        return
+    seasons = resp.json().get("seasons", [])
+    if not seasons:
+        return
+    current_season_id = max(s["id"] for s in seasons)
+
+    season_resp = _api_get(
+        f"{char_base}/mythic-keystone-profile/season/{current_season_id}",
+        _PROFILE_PARAMS,
+        auth_headers,
+    )
+    if season_resp.status_code != 200:
+        logger.warning(
+            "Blizzard API %s mythic-keystone-profile/season/%s",
+            season_resp.status_code,
+            current_season_id,
+        )
+        return
+
+    data = season_resp.json()
+    expiry = timezone.now() + datetime.timedelta(days=30)
+    mp_record, _ = ProfileAltMythicPlus.objects.update_or_create(
+        alt=alt,
+        defaults={
+            "season_id": data.get("season", {}).get("id", current_season_id),
+            "mythic_rating": data.get("mythic_rating", {}).get("rating", 0),
+            "alt_mythicplus_expiry_date": expiry,
+        },
+    )
+
+    # Blizzard can list two entries per dungeon (best-timed and best-overall) sharing the
+    # same map_rating but different keystone_level — keep the highest level per dungeon.
+    best_run_by_dungeon: dict[int, dict] = {}
+    for run in data.get("best_runs", []):
+        dungeon_id = run.get("dungeon", {}).get("id")
+        if dungeon_id is None:
+            continue
+        existing = best_run_by_dungeon.get(dungeon_id)
+        if existing is None or run.get("keystone_level", 0) > existing.get("keystone_level", 0):
+            best_run_by_dungeon[dungeon_id] = run
+
+    for dungeon_id, run in best_run_by_dungeon.items():
+        try:
+            dungeon = DataMythicDungeon.objects.get(dungeon_id=dungeon_id)
+        except DataMythicDungeon.DoesNotExist:
+            continue
+        ts = run.get("completed_timestamp")
+        completed = timezone.datetime.fromtimestamp(ts / 1000, tz=datetime.UTC) if ts else None
+        ProfileAltMythicPlusDungeon.objects.update_or_create(
+            alt=mp_record,
+            dungeon=dungeon,
+            defaults={
+                "keystone_level": run.get("keystone_level", 0),
+                "score": run.get("map_rating", {}).get("rating", 0),
+                "completed_timestamp": completed,
+                "is_completed_within_time": run.get("is_completed_within_time", False),
+                "alt_mythicplusdungeon_expiry_date": expiry,
+            },
+        )
+
+
 # ---------------------------------------------------------------------------
 # Static data sync helpers — achievements + factions
 # ---------------------------------------------------------------------------
@@ -857,3 +942,14 @@ def _sync_faction_data(index_data: dict) -> None:
             )
         except (KeyError, TypeError) as exc:
             logger.warning("Failed to parse faction %s: %s", faction_ref.get("id"), exc)
+
+
+def _sync_mythic_dungeon_data(index_data: dict) -> None:
+    for dungeon_ref in index_data.get("dungeons", []):
+        try:
+            DataMythicDungeon.objects.get_or_create(
+                dungeon_id=dungeon_ref["id"],
+                defaults={"dungeon_name": dungeon_ref["name"]},
+            )
+        except (KeyError, TypeError) as exc:
+            logger.warning("Failed to parse dungeon %s: %s", dungeon_ref.get("id"), exc)
