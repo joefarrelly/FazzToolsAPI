@@ -33,6 +33,7 @@ profile.register(r"altachievements", views.ProfileAltAchievementView)
 profile.register(r"altreputations", views.ProfileAltReputationView)
 profile.register(r"altmythicplus", views.ProfileAltMythicPlusView)
 profile.register(r"altmythicplusdungeons", views.ProfileAltMythicPlusDungeonView)
+profile.register(r"altaddondata", views.ProfileAltAddonDataView)
 
 data = routers.DefaultRouter()
 data.register(r"professions", views.DataProfessionView)

@@ -8,7 +8,6 @@ import time
 
 import environ
 import requests
-from django.core.cache import cache
 from django.core.files.base import ContentFile
 from django.db import models
 from django.utils import timezone
@@ -36,6 +35,7 @@ from apicore.models import (
     DataRecipeReagent,
     ProfileAlt,
     ProfileAltAchievement,
+    ProfileAltAddonData,
     ProfileAltEquipment,
     ProfileAltMythicPlus,
     ProfileAltMythicPlusDungeon,
@@ -61,6 +61,7 @@ from apicore.serializers import (
     DataReagentSerializer,
     DataRecipeReagentSerializer,
     ProfileAltAchievementSerializer,
+    ProfileAltAddonDataSerializer,
     ProfileAltEquipmentSerializer,
     ProfileAltMythicPlusDungeonSerializer,
     ProfileAltMythicPlusSerializer,
@@ -195,7 +196,29 @@ class ProfileUserView(viewsets.ModelViewSet):
             logger.warning("Could not remove old file: %s", exc)
 
         serializer.save(user_id=user_id, user_file=normalised_file, user_last_update=update_date)
-        cache.delete(f"userfile:{user_id}")
+        self._sync_addon_data(user_id, normalised)
+
+    @staticmethod
+    def _sync_addon_data(user_id, normalised_content):
+        try:
+            parsed = LuaParser(normalised_content.splitlines(keepends=True)).parse()
+        except (ValueError, IndexError) as exc:
+            logger.warning("Could not parse addon file for %s: %s", user_id, exc)
+            return
+
+        addon_alts = parsed.get("alts", {})
+        for alt in ProfileAlt.objects.filter(user=user_id):
+            addon_alt = addon_alts.get(f"{alt.alt_name}-{alt.alt_realm}")
+            if addon_alt is None:
+                continue
+            ProfileAltAddonData.objects.update_or_create(
+                alt=alt,
+                defaults={
+                    "gold": addon_alt.get("gold") or 0,
+                    "played_time_total": addon_alt.get("playedTimeTotal") or 0,
+                    "played_time_level": addon_alt.get("playedTimeLevel") or 0,
+                },
+            )
 
     def list(self, request):
         user_id = request.query_params.get("user")
@@ -212,32 +235,6 @@ class ProfileUserView(viewsets.ModelViewSet):
         if page == "header":
             ts = time.mktime(user_obj.user_last_update.timetuple()) * 1000
             return response.Response([ts])
-
-        if not user_obj.user_file:
-            return response.Response([])
-
-        cache_key = f"userfile:{user_id}"
-        data = cache.get(cache_key)
-        if data is None:
-            with user_obj.user_file.open("rb") as f:
-                lines = [line.decode("utf-8") for line in f.readlines()]
-            data = LuaParser(lines).parse()
-            cache.set(cache_key, data, timeout=None)
-
-        if page == "addon":
-            addon_alts = data.get("alts", {})
-            result = []
-            for alt in ProfileAlt.objects.filter(user=user_id):
-                addon_alt = addon_alts.get(f"{alt.alt_name}-{alt.alt_realm}", {})
-                result.append(
-                    {
-                        "alt_id": alt.alt_id,
-                        "gold": addon_alt.get("gold"),
-                        "played_time_total": addon_alt.get("playedTimeTotal"),
-                        "played_time_level": addon_alt.get("playedTimeLevel"),
-                    }
-                )
-            return response.Response(result)
 
         return response.Response([])
 
@@ -932,6 +929,24 @@ class ProfileAltMythicPlusDungeonView(viewsets.ModelViewSet):
                 .order_by("alt__alt__alt_name", "-score")
             )
 
+        serializer = self.get_serializer(qs, many=True)
+        return response.Response(serializer.data)
+
+
+class ProfileAltAddonDataView(viewsets.ModelViewSet):
+    serializer_class = ProfileAltAddonDataSerializer
+    queryset = ProfileAltAddonData.objects.all()
+
+    def list(self, request):
+        user_id = request.query_params.get("user")
+
+        if not user_id:
+            return response.Response([])
+        if request.session.get("user_id") != user_id:
+            return response.Response([], status=403)
+
+        alt_ids = ProfileAlt.objects.filter(user=user_id).values_list("alt_id", flat=True)
+        qs = ProfileAltAddonData.objects.filter(alt__in=alt_ids).select_related("alt")
         serializer = self.get_serializer(qs, many=True)
         return response.Response(serializer.data)
 

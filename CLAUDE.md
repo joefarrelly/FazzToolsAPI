@@ -100,6 +100,7 @@ conftest.py             pytest env-var setup (pytest_configure hook)
 - `altreputations` — `ProfileAltReputation`: Faction standing per alt
 - `altmythicplus` — `ProfileAltMythicPlus`: Current-season M+ rating summary per alt
 - `altmythicplusdungeons` — `ProfileAltMythicPlusDungeon`: Best run per dungeon per alt
+- `altaddondata` — `ProfileAltAddonData`: Gold + played time per alt, parsed from the uploaded `.lua` file (addon-only, no Blizzard API equivalent)
 
 ### Data endpoints (static WoW data, synced via DataScan task)
 - `professions`, `professiontiers`, `professionrecipes`, `reagents`, `recipereagents`
@@ -150,14 +151,13 @@ Dispatches six independent subtasks: `scanProfessionData`, `scanMountData`, `sca
 - `fullDataScan` — weekly, Sunday 03:00 UTC, with `BLIZZ_CLIENT`/`BLIZZ_SECRET` baked into the schedule args at startup. The admin-triggered `/api/custom/datascan/` endpoints still work for ad-hoc/manual scans (e.g. testing a single category).
 
 ### Lua addon file
-`ProfileUser.perform_update` validates and stores a `FazzToolsScraper.lua` addon export.
-`ProfileUserView.list` with `?page=header` returns the last-update timestamp; the file is parsed via `LuaParser` and cached on read (`userfile:{user_id}`), ready for future addon-only data (gold, currencies, lockouts) to consume — no page handler reads it yet.
+`ProfileUser.perform_update` validates and stores a `FazzToolsScraper.lua` addon export, then parses it via `LuaParser` and upserts `ProfileAltAddonData` for each alt found in the file (matched by `f"{alt.alt_name}-{alt.alt_realm}"`, the display name + display realm key `core.lua` writes). This is parse-on-upload, not parse-on-read — there's no Celery sync task for this data since it only ever exists in the addon export, never the Blizzard API, so the upload itself is the sync point. A failed parse logs a warning and leaves the stored file/timestamp update intact rather than failing the upload. Currencies/lockouts/keystone/vault are captured by the addon but not yet parsed into a model — same pattern, not built.
 
 ## Database tables (all prefixed `ft_`)
 
 **Data (static):** `ft_data_profession`, `ft_data_professiontier`, `ft_data_professionrecipe`, `ft_data_reagent`, `ft_data_recipereagent`, `ft_data_equipment`, `ft_data_equipmentvariant`, `ft_data_mount`, `ft_data_pet`, `ft_data_achievement`, `ft_data_faction`, `ft_data_mythicdungeon`
 
-**Profile (user):** `ft_profile_user`, `ft_profile_alt`, `ft_profile_altprofession`, `ft_profile_altprofessiondata`, `ft_profile_altequipment`, `ft_profile_usermount`, `ft_profile_userpet`, `ft_profile_altachievement`, `ft_profile_altreputation`, `ft_profile_altmythicplus`, `ft_profile_altmythicplusdungeon`
+**Profile (user):** `ft_profile_user`, `ft_profile_alt`, `ft_profile_altprofession`, `ft_profile_altprofessiondata`, `ft_profile_altequipment`, `ft_profile_usermount`, `ft_profile_userpet`, `ft_profile_altachievement`, `ft_profile_altreputation`, `ft_profile_altmythicplus`, `ft_profile_altmythicplusdungeon`, `ft_profile_altaddondata`
 
 ## Things to know
 

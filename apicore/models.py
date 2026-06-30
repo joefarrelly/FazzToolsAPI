@@ -412,3 +412,19 @@ class ProfileAltMythicPlusDungeon(models.Model):
 
     def __str__(self):
         return f"{self.alt} - {self.dungeon}"
+
+
+class ProfileAltAddonData(models.Model):
+    """Per-alt data that only exists in the uploaded addon export (no Blizzard API
+    equivalent), parsed and upserted from the .lua file on upload."""
+
+    alt = models.OneToOneField(ProfileAlt, on_delete=models.CASCADE, primary_key=True)
+    gold = models.PositiveBigIntegerField(default=0)
+    played_time_total = models.PositiveIntegerField(default=0)
+    played_time_level = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        db_table = "ft_profile_altaddondata"
+
+    def __str__(self):
+        return f"{self.alt.alt_name} - {self.alt.alt_realm}"
