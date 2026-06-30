@@ -6,9 +6,13 @@ that runs before those calls.
 """
 
 import pytest
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import Client
+from django.test.client import BOUNDARY, MULTIPART_CONTENT, encode_multipart
+from django.utils import timezone
 
 from apicore.libs.expansion_order import tier_sort_key
+from apicore.models import ProfileUser
 
 # ---------------------------------------------------------------------------
 # Pure helper: tier_sort_key
@@ -123,6 +127,34 @@ class TestProfileUserView:
         resp = c.get("/api/profile/users/?user=nobody&page=header")
         assert resp.status_code == 200
         assert resp.json() == []
+
+    def test_upload_does_not_500(self):
+        """Regression test: uploads used to crash perform_update with 'I/O operation
+        on closed file' because a `with file.open("r+")` block closed the upload
+        stream's underlying BytesIO before it was handed to the storage backend —
+        Django's InMemoryUploadedFile doesn't override File.close()."""
+        user_id = "u1"
+        ProfileUser.objects.create(user_id=user_id, user_file="", user_last_update=timezone.now())
+        c = self._authed_client(user_id)
+
+        body = "FazzToolsScraperDB = {\n}\n"
+        upload = SimpleUploadedFile(
+            "FazzToolsScraper.lua", body.encode(), content_type="text/plain"
+        )
+
+        resp = c.put(
+            f"/api/profile/users/{user_id}/",
+            data=encode_multipart(
+                BOUNDARY,
+                {
+                    "user_id": user_id,
+                    "user_file": upload,
+                    "user_last_update": timezone.now().isoformat(),
+                },
+            ),
+            content_type=MULTIPART_CONTENT,
+        )
+        assert resp.status_code == 200
 
 
 # ---------------------------------------------------------------------------

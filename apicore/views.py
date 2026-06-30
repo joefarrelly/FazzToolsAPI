@@ -9,6 +9,7 @@ import time
 import environ
 import requests
 from django.core.cache import cache
+from django.core.files.base import ContentFile
 from django.db import models
 from django.utils import timezone
 from requests.adapters import HTTPAdapter
@@ -175,18 +176,14 @@ class ProfileUserView(viewsets.ModelViewSet):
             logger.warning("Rejected upload: file too large (%d bytes)", file.size)
             return
 
-        file.name = user_id + ".lua"
-        with file.open("r+") as f:
-            content = f.read().decode("utf-8")
+        content = file.read().decode("utf-8")
 
-            if "FazzToolsScraperDB" not in content[0:25]:
-                logger.warning("Rejected upload: invalid file header")
-                return
+        if "FazzToolsScraperDB" not in content[0:25]:
+            logger.warning("Rejected upload: invalid file header")
+            return
 
-            normalised = re.sub(r'(\r\n|\r|\n)(?=(?:[^"]*"[^"]*")*[^"]*$)', r"\n", content)
-            f.seek(0)
-            f.write(normalised.encode())
-            f.truncate()
+        normalised = re.sub(r'(\r\n|\r|\n)(?=(?:[^"]*"[^"]*")*[^"]*$)', r"\n", content)
+        normalised_file = ContentFile(normalised.encode(), name=user_id + ".lua")
 
         user_obj = ProfileUser.objects.get(user_id=user_id)
         update_date = user_obj.user_last_update
@@ -197,7 +194,7 @@ class ProfileUserView(viewsets.ModelViewSet):
         except OSError as exc:
             logger.warning("Could not remove old file: %s", exc)
 
-        serializer.save(user_id=user_id, user_file=file, user_last_update=update_date)
+        serializer.save(user_id=user_id, user_file=normalised_file, user_last_update=update_date)
         cache.delete(f"userfile:{user_id}")
 
     def list(self, request):
