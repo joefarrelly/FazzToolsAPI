@@ -156,6 +156,45 @@ class TestProfileUserView:
         )
         assert resp.status_code == 200
 
+    def test_addon_page_reads_uploaded_file(self):
+        """Regression test: page=addon (and any non-header page reading the
+        uploaded file) used to crash with 'str' object has no attribute 'decode'
+        because the file was opened in text mode ("r") despite the parser
+        expecting bytes to decode itself."""
+        user_id = "u1"
+        ProfileUser.objects.create(user_id=user_id, user_file="", user_last_update=timezone.now())
+        c = self._authed_client(user_id)
+
+        body = (
+            "FazzToolsScraperDB = {\n"
+            "preamble\n"
+            '["alts"] = {\n'
+            '["Testchar-Realm"] = {\n'
+            '["gold"] = 12345,\n'
+            "},\n"
+            "},\n"
+            "}\n"
+        )
+        upload = SimpleUploadedFile(
+            "FazzToolsScraper.lua", body.encode(), content_type="text/plain"
+        )
+        c.put(
+            f"/api/profile/users/{user_id}/",
+            data=encode_multipart(
+                BOUNDARY,
+                {
+                    "user_id": user_id,
+                    "user_file": upload,
+                    "user_last_update": timezone.now().isoformat(),
+                },
+            ),
+            content_type=MULTIPART_CONTENT,
+        )
+
+        resp = c.get(f"/api/profile/users/?user={user_id}&page=addon")
+        assert resp.status_code == 200
+        assert resp.json() == []
+
 
 # ---------------------------------------------------------------------------
 # ProfileAltView — IsSessionUser enforcement
