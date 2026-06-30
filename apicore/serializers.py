@@ -15,6 +15,7 @@ from apicore.models import (
     DataRecipeReagent,
     ProfileAlt,
     ProfileAltAchievement,
+    ProfileAltAddonData,
     ProfileAltEquipment,
     ProfileAltMythicPlus,
     ProfileAltMythicPlusDungeon,
@@ -288,3 +289,11 @@ class ProfileAltMythicPlusDungeonSerializer(serializers.ModelSerializer):
             "completed_timestamp",
             "is_completed_within_time",
         )
+
+
+class ProfileAltAddonDataSerializer(serializers.ModelSerializer):
+    alt_id = serializers.ReadOnlyField(source="alt.alt_id")
+
+    class Meta:
+        model = ProfileAltAddonData
+        fields = ("alt_id", "gold", "played_time_total", "played_time_level")
