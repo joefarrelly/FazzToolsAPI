@@ -116,6 +116,11 @@ CELERY_BEAT_SCHEDULE = {
 REST_FRAMEWORK = {
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
     "PAGE_SIZE": 100,
+    # Profile/custom endpoints use the custom IsSessionUser permission, not Django auth,
+    # so they don't need an authenticator. Leaving SessionAuthentication as the default
+    # meant any lingering Django admin session cookie (from /api/admin/) made DRF enforce
+    # CSRF on every API call, breaking bnetlogin and other endpoints for logged-in admins.
+    "DEFAULT_AUTHENTICATION_CLASSES": [],
 }
 
 CORS_ALLOWED_ORIGINS = [
