@@ -8,10 +8,10 @@ that runs before those calls.
 import pytest
 from django.test import Client
 
-from apicore.libs.keybind_builder import tier_sort_key
+from apicore.libs.expansion_order import tier_sort_key
 
 # ---------------------------------------------------------------------------
-# Pure helper: _tier_sort_key
+# Pure helper: tier_sort_key
 # ---------------------------------------------------------------------------
 
 

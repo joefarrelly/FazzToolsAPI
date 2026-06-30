@@ -4,7 +4,6 @@ import hmac
 import logging
 import os
 import re
-import string
 import time
 
 import environ
@@ -18,7 +17,7 @@ from rest_framework.exceptions import PermissionDenied
 from rest_framework.permissions import IsAdminUser
 from urllib3.util.retry import Retry
 
-from apicore.libs.keybind_builder import build_all_keybinds, build_single_keybinds, tier_sort_key
+from apicore.libs.expansion_order import tier_sort_key
 from apicore.libs.lua_parser import LuaParser
 from apicore.models import (
     DataAchievement,
@@ -191,7 +190,7 @@ class ProfileUserView(viewsets.ModelViewSet):
             logger.warning("Could not remove old file: %s", exc)
 
         serializer.save(user_id=user_id, user_file=file, user_last_update=update_date)
-        cache.delete(f"keybinds:{user_id}")
+        cache.delete(f"userfile:{user_id}")
 
     def list(self, request):
         user_id = request.query_params.get("user")
@@ -212,22 +211,13 @@ class ProfileUserView(viewsets.ModelViewSet):
         if not user_obj.user_file:
             return response.Response([])
 
-        cache_key = f"keybinds:{user_id}"
+        cache_key = f"userfile:{user_id}"
         data = cache.get(cache_key)
         if data is None:
             with user_obj.user_file.open("r") as f:
                 lines = [line.decode("utf-8") for line in f.readlines()]
             data = LuaParser(lines).parse()
             cache.set(cache_key, data, timeout=None)
-
-        if page == "all":
-            return response.Response(build_all_keybinds(data, user_id))
-
-        if page == "single":
-            alt_name = request.query_params.get("alt", "").title()
-            realm = string.capwords(request.query_params.get("realm", ""))
-            spec = request.query_params.get("spec", "").title()
-            return response.Response(build_single_keybinds(data, alt_name, realm, spec))
 
         return response.Response([])
 
