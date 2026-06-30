@@ -1,6 +1,6 @@
 # FazzToolsAPI
 
-Django REST Framework backend for **FazzTools** — a World of Warcraft companion app. Integrates with the Blizzard Battle.net API to sync character data (professions, equipment, mounts, pets) and parses uploaded WoW Lua addon files to serve keybind data.
+Django REST Framework backend for **FazzTools** — a World of Warcraft companion app. Integrates with the Blizzard Battle.net API to sync character data (professions, equipment, mounts, pets) and stores uploaded WoW Lua addon exports for future addon-only data (gold, currencies, lockouts).
 
 The companion frontend lives at `../FazzToolsFrontend` (React, port 3000 in dev).
 
@@ -71,13 +71,12 @@ apicore/                The single Django app
   serializers.py        DRF serializers
   permissions.py        IsSessionUser permission class
   libs/
-    keybind_builder.py    Pure keybind-building logic (build_all/single_keybinds, tier_sort_key)
-    keybind_mapping.py    Slot→action-button mappings per addon
     lua_parser.py         Hand-rolled Lua-table-to-JSON converter
     icon_mapping.py       Mount/pet icon mappings
     faction_expansion.py  Hardcoded faction_id → expansion name mapping (283 factions)
+    expansion_order.py    tier_sort_key — sorts profession tiers by expansion order
   migrations/           DB migrations
-tests/                  pytest suite (47 tests); run via pytest tests/
+tests/                  pytest suite (33 tests); run via pytest tests/
 conftest.py             pytest env-var setup (pytest_configure hook)
 ```
 
@@ -141,9 +140,9 @@ Picks the highest-level, highest-ilvl alt per faction (Alliance + Horde) and fet
 ### Data scan (`fullDataScan` Celery task)
 Dispatches five independent subtasks: `scanProfessionData`, `scanMountData`, `scanPetData`, `scanAchievementData`, `scanFactionData`. Each can also be triggered individually via its own endpoint.
 
-### Lua keybind file
-`ProfileUser.perform_update` validates and stores a `FazzToolsScraper.lua` addon export.  
-`ProfileUserView.list` with `?page=all` or `?page=single` parses the stored Lua file using the `recursive()` function (a hand-rolled Lua-table-to-JSON converter) and joins results against `ProfileAlt` + Blizzard spell data. Returns per-spec keybind mappings.
+### Lua addon file
+`ProfileUser.perform_update` validates and stores a `FazzToolsScraper.lua` addon export.
+`ProfileUserView.list` with `?page=header` returns the last-update timestamp; the file is parsed via `LuaParser` and cached on read (`userfile:{user_id}`), ready for future addon-only data (gold, currencies, lockouts) to consume — no page handler reads it yet.
 
 ## Database tables (all prefixed `ft_`)
 

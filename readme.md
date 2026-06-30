@@ -9,7 +9,7 @@
 
 Django REST Framework backend for **FazzTools** — a World of Warcraft companion app.
 
-Syncs character data (professions, equipment, mounts, pets) from the Blizzard Battle.net API and parses WoW Lua addon exports to serve keybind data.
+Syncs character data (professions, equipment, mounts, pets) from the Blizzard Battle.net API and stores uploaded WoW Lua addon exports for future addon-only data.
 
 The companion frontend lives at [FazzToolsFrontend](../FazzToolsFrontend).
 
