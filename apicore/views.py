@@ -14,6 +14,7 @@ from django.db import models
 from django.utils import timezone
 from requests.adapters import HTTPAdapter
 from rest_framework import response, viewsets
+from rest_framework.authentication import SessionAuthentication
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.permissions import IsAdminUser
 from urllib3.util.retry import Retry
@@ -869,6 +870,7 @@ class Logout(viewsets.ViewSet):
 
 
 class DataScan(viewsets.ViewSet):
+    authentication_classes = [SessionAuthentication]
     permission_classes = [IsAdminUser]
 
     def create(self, request):
@@ -877,6 +879,7 @@ class DataScan(viewsets.ViewSet):
 
 
 class DataScanProfessions(viewsets.ViewSet):
+    authentication_classes = [SessionAuthentication]
     permission_classes = [IsAdminUser]
 
     def create(self, request):
@@ -885,6 +888,7 @@ class DataScanProfessions(viewsets.ViewSet):
 
 
 class DataScanMounts(viewsets.ViewSet):
+    authentication_classes = [SessionAuthentication]
     permission_classes = [IsAdminUser]
 
     def create(self, request):
@@ -893,6 +897,7 @@ class DataScanMounts(viewsets.ViewSet):
 
 
 class DataScanPets(viewsets.ViewSet):
+    authentication_classes = [SessionAuthentication]
     permission_classes = [IsAdminUser]
 
     def create(self, request):
@@ -901,6 +906,7 @@ class DataScanPets(viewsets.ViewSet):
 
 
 class DataScanAchievements(viewsets.ViewSet):
+    authentication_classes = [SessionAuthentication]
     permission_classes = [IsAdminUser]
 
     def create(self, request):
@@ -909,6 +915,7 @@ class DataScanAchievements(viewsets.ViewSet):
 
 
 class DataScanFactions(viewsets.ViewSet):
+    authentication_classes = [SessionAuthentication]
     permission_classes = [IsAdminUser]
 
     def create(self, request):
