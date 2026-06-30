@@ -219,7 +219,7 @@ class ProfileUserView(viewsets.ModelViewSet):
         cache_key = f"userfile:{user_id}"
         data = cache.get(cache_key)
         if data is None:
-            with user_obj.user_file.open("r") as f:
+            with user_obj.user_file.open("rb") as f:
                 lines = [line.decode("utf-8") for line in f.readlines()]
             data = LuaParser(lines).parse()
             cache.set(cache_key, data, timeout=None)
