@@ -227,6 +227,21 @@ class ProfileUserView(viewsets.ModelViewSet):
             data = LuaParser(lines).parse()
             cache.set(cache_key, data, timeout=None)
 
+        if page == "addon":
+            addon_alts = data.get("alts", {})
+            result = []
+            for alt in ProfileAlt.objects.filter(user=user_id):
+                addon_alt = addon_alts.get(f"{alt.alt_name}-{alt.alt_realm}", {})
+                result.append(
+                    {
+                        "alt_id": alt.alt_id,
+                        "gold": addon_alt.get("gold"),
+                        "played_time_total": addon_alt.get("playedTimeTotal"),
+                        "played_time_level": addon_alt.get("playedTimeLevel"),
+                    }
+                )
+            return response.Response(result)
+
         return response.Response([])
 
 
