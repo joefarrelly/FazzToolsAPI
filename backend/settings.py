@@ -1,6 +1,7 @@
 from pathlib import Path
 
 import environ
+from celery.schedules import crontab
 
 env = environ.Env()
 environ.Env.read_env()
@@ -110,6 +111,11 @@ CELERY_BEAT_SCHEDULE = {
     "purge-stale-profiles-daily": {
         "task": "apicore.tasks.purge_stale_profiles",
         "schedule": 86400,
+    },
+    "full-data-scan-weekly": {
+        "task": "apicore.tasks.fullDataScan",
+        "schedule": crontab(day_of_week="sunday", hour=3, minute=0),
+        "args": (env("BLIZZ_CLIENT"), env("BLIZZ_SECRET")),
     },
 }
 

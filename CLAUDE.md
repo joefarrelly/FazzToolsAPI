@@ -145,6 +145,10 @@ Picks the highest-level, highest-ilvl alt per faction (Alliance + Horde) and fet
 ### Data scan (`fullDataScan` Celery task)
 Dispatches six independent subtasks: `scanProfessionData`, `scanMountData`, `scanPetData`, `scanAchievementData`, `scanFactionData`, `scanMythicDungeonData`. Each can also be triggered individually via its own endpoint. The dungeon index requires `namespace=dynamic-eu` (not `static-eu` like other catalogs).
 
+### Scheduled tasks (`CELERY_BEAT_SCHEDULE` in `settings.py`)
+- `purge_stale_profiles` — daily, deletes expired profile records.
+- `fullDataScan` — weekly, Sunday 03:00 UTC, with `BLIZZ_CLIENT`/`BLIZZ_SECRET` baked into the schedule args at startup. The admin-triggered `/api/custom/datascan/` endpoints still work for ad-hoc/manual scans (e.g. testing a single category).
+
 ### Lua addon file
 `ProfileUser.perform_update` validates and stores a `FazzToolsScraper.lua` addon export.
 `ProfileUserView.list` with `?page=header` returns the last-update timestamp; the file is parsed via `LuaParser` and cached on read (`userfile:{user_id}`), ready for future addon-only data (gold, currencies, lockouts) to consume — no page handler reads it yet.
