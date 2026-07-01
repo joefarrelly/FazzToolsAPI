@@ -2,7 +2,6 @@
 
 [![Deploy](https://github.com/joefarrelly/FazzToolsAPI/actions/workflows/deploy.yml/badge.svg)](https://github.com/joefarrelly/FazzToolsAPI/actions/workflows/deploy.yml)
 [![Lint and Test](https://github.com/joefarrelly/FazzToolsAPI/actions/workflows/lint.yml/badge.svg)](https://github.com/joefarrelly/FazzToolsAPI/actions/workflows/lint.yml)
-[![codecov](https://codecov.io/gh/joefarrelly/FazzToolsAPI/graph/badge.svg)](https://codecov.io/gh/joefarrelly/FazzToolsAPI)
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 
 **Suite:** [Backend](https://github.com/joefarrelly/FazzToolsAPI) · [Frontend](https://github.com/joefarrelly/FazzToolsFrontend) · [Addon](https://github.com/joefarrelly/FazzToolsScraper)
