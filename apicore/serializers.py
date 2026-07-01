@@ -1,9 +1,12 @@
 from rest_framework import serializers
 
 from apicore.models import (
+    DataAchievement,
     DataEquipment,
     DataEquipmentVariant,
+    DataFaction,
     DataMount,
+    DataMythicDungeon,
     DataPet,
     DataProfession,
     DataProfessionRecipe,
@@ -11,9 +14,14 @@ from apicore.models import (
     DataReagent,
     DataRecipeReagent,
     ProfileAlt,
+    ProfileAltAchievement,
+    ProfileAltAddonData,
     ProfileAltEquipment,
+    ProfileAltMythicPlus,
+    ProfileAltMythicPlusDungeon,
     ProfileAltProfession,
     ProfileAltProfessionData,
+    ProfileAltReputation,
     ProfileUser,
     ProfileUserMount,
     ProfileUserPet,
@@ -69,7 +77,7 @@ class DataEquipmentVariantSerializer(serializers.HyperlinkedModelSerializer):
             "equipment",
             "variant",
             "stamina",
-            "armour",
+            "armor",
             "strength",
             "agility",
             "intellect",
@@ -197,3 +205,95 @@ class ProfileAltEquipmentSerializer(serializers.ModelSerializer):
             "weapon2",
             "alt_equipment_expiry_date",
         )
+
+
+class DataAchievementSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = DataAchievement
+        fields = (
+            "achievement_id",
+            "achievement_name",
+            "achievement_points",
+            "achievement_category",
+        )
+
+
+class DataFactionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = DataFaction
+        fields = ("faction_id", "faction_name")
+
+
+class ProfileAltAchievementSerializer(serializers.ModelSerializer):
+    alt_name = serializers.ReadOnlyField(source="alt.alt_name")
+    achievement_name = serializers.ReadOnlyField(source="achievement.achievement_name")
+    achievement_points = serializers.ReadOnlyField(source="achievement.achievement_points")
+    achievement_category = serializers.ReadOnlyField(source="achievement.achievement_category")
+
+    class Meta:
+        model = ProfileAltAchievement
+        fields = (
+            "alt",
+            "alt_name",
+            "achievement",
+            "achievement_name",
+            "achievement_points",
+            "achievement_category",
+            "completed_timestamp",
+        )
+
+
+class ProfileAltReputationSerializer(serializers.ModelSerializer):
+    alt_name = serializers.ReadOnlyField(source="alt.alt_name")
+    faction_name = serializers.ReadOnlyField(source="faction.faction_name")
+    faction_category = serializers.ReadOnlyField(source="faction.faction_category")
+
+    class Meta:
+        model = ProfileAltReputation
+        fields = (
+            "alt",
+            "alt_name",
+            "faction",
+            "faction_name",
+            "faction_category",
+            "standing_type",
+            "standing_value",
+        )
+
+
+class DataMythicDungeonSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = DataMythicDungeon
+        fields = ("dungeon_id", "dungeon_name")
+
+
+class ProfileAltMythicPlusSerializer(serializers.ModelSerializer):
+    alt_name = serializers.ReadOnlyField(source="alt.alt_name")
+
+    class Meta:
+        model = ProfileAltMythicPlus
+        fields = ("alt", "alt_name", "season_id", "mythic_rating")
+
+
+class ProfileAltMythicPlusDungeonSerializer(serializers.ModelSerializer):
+    dungeon_name = serializers.ReadOnlyField(source="dungeon.dungeon_name")
+
+    class Meta:
+        model = ProfileAltMythicPlusDungeon
+        fields = (
+            "alt",
+            "dungeon",
+            "dungeon_name",
+            "keystone_level",
+            "score",
+            "completed_timestamp",
+            "is_completed_within_time",
+        )
+
+
+class ProfileAltAddonDataSerializer(serializers.ModelSerializer):
+    alt_id = serializers.ReadOnlyField(source="alt.alt_id")
+
+    class Meta:
+        model = ProfileAltAddonData
+        fields = ("alt_id", "gold", "played_time_total", "played_time_level")

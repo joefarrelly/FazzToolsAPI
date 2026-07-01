@@ -90,7 +90,7 @@ class DataEquipmentVariant(models.Model):
     equipment = models.ForeignKey(DataEquipment, on_delete=models.CASCADE)
     variant = models.CharField(max_length=64)
     stamina = models.PositiveSmallIntegerField()
-    armour = models.PositiveSmallIntegerField()
+    armor = models.PositiveSmallIntegerField()
     strength = models.PositiveSmallIntegerField()
     agility = models.PositiveSmallIntegerField()
     intellect = models.PositiveSmallIntegerField()
@@ -206,6 +206,7 @@ class ProfileAlt(models.Model):
     alt_id = models.PositiveIntegerField(primary_key=True)
     alt_account_id = models.PositiveIntegerField()
     alt_level = models.PositiveSmallIntegerField()
+    alt_ilvl = models.PositiveSmallIntegerField(default=0)
     alt_name = models.CharField(max_length=64)
     alt_realm = models.CharField(max_length=64)
     alt_realm_id = models.PositiveSmallIntegerField()
@@ -307,6 +308,123 @@ class ProfileAltEquipment(models.Model):
 
     class Meta:
         db_table = "ft_profile_altequipment"
+
+    def __str__(self):
+        return f"{self.alt.alt_name} - {self.alt.alt_realm}"
+
+
+class DataAchievement(models.Model):
+    achievement_id = models.PositiveIntegerField(primary_key=True)
+    achievement_name = models.CharField(max_length=256)
+    achievement_points = models.PositiveSmallIntegerField(default=0)
+    achievement_category = models.CharField(max_length=128, default="")
+
+    class Meta:
+        db_table = "ft_data_achievement"
+
+    def __str__(self):
+        return f"{self.achievement_id} - {self.achievement_name}"
+
+
+class DataFaction(models.Model):
+    faction_id = models.PositiveIntegerField(primary_key=True)
+    faction_name = models.CharField(max_length=256)
+    faction_category = models.CharField(max_length=128, default="")
+
+    class Meta:
+        db_table = "ft_data_faction"
+
+    def __str__(self):
+        return f"{self.faction_id} - {self.faction_name}"
+
+
+class ProfileAltAchievement(models.Model):
+    alt = models.ForeignKey(ProfileAlt, on_delete=models.CASCADE)
+    achievement = models.ForeignKey(DataAchievement, on_delete=models.CASCADE)
+    completed_timestamp = models.DateTimeField(null=True, blank=True)
+    alt_achievement_expiry_date = models.DateTimeField()
+
+    class Meta:
+        db_table = "ft_profile_altachievement"
+        constraints = [
+            models.UniqueConstraint(fields=["alt", "achievement"], name="unique_altachievement")
+        ]
+
+    def __str__(self):
+        return f"{self.alt} - {self.achievement}"
+
+
+class ProfileAltReputation(models.Model):
+    alt = models.ForeignKey(ProfileAlt, on_delete=models.CASCADE)
+    faction = models.ForeignKey(DataFaction, on_delete=models.CASCADE)
+    standing_type = models.CharField(max_length=32)
+    standing_value = models.IntegerField()
+    alt_reputation_expiry_date = models.DateTimeField()
+
+    class Meta:
+        db_table = "ft_profile_altreputation"
+        constraints = [
+            models.UniqueConstraint(fields=["alt", "faction"], name="unique_altreputation")
+        ]
+
+    def __str__(self):
+        return f"{self.alt} - {self.faction}"
+
+
+class DataMythicDungeon(models.Model):
+    dungeon_id = models.PositiveIntegerField(primary_key=True)
+    dungeon_name = models.CharField(max_length=256)
+
+    class Meta:
+        db_table = "ft_data_mythicdungeon"
+
+    def __str__(self):
+        return f"{self.dungeon_id} - {self.dungeon_name}"
+
+
+class ProfileAltMythicPlus(models.Model):
+    alt = models.OneToOneField(ProfileAlt, on_delete=models.CASCADE, primary_key=True)
+    season_id = models.PositiveIntegerField()
+    mythic_rating = models.FloatField(default=0)
+    alt_mythicplus_expiry_date = models.DateTimeField()
+
+    class Meta:
+        db_table = "ft_profile_altmythicplus"
+
+    def __str__(self):
+        return f"{self.alt.alt_name} - {self.alt.alt_realm}"
+
+
+class ProfileAltMythicPlusDungeon(models.Model):
+    alt = models.ForeignKey(ProfileAltMythicPlus, on_delete=models.CASCADE)
+    dungeon = models.ForeignKey(DataMythicDungeon, on_delete=models.CASCADE)
+    keystone_level = models.PositiveSmallIntegerField(default=0)
+    score = models.FloatField(default=0)
+    completed_timestamp = models.DateTimeField(null=True, blank=True)
+    is_completed_within_time = models.BooleanField(default=False)
+    alt_mythicplusdungeon_expiry_date = models.DateTimeField()
+
+    class Meta:
+        db_table = "ft_profile_altmythicplusdungeon"
+        constraints = [
+            models.UniqueConstraint(fields=["alt", "dungeon"], name="unique_altmythicplusdungeon")
+        ]
+
+    def __str__(self):
+        return f"{self.alt} - {self.dungeon}"
+
+
+class ProfileAltAddonData(models.Model):
+    """Per-alt data that only exists in the uploaded addon export (no Blizzard API
+    equivalent), parsed and upserted from the .lua file on upload."""
+
+    alt = models.OneToOneField(ProfileAlt, on_delete=models.CASCADE, primary_key=True)
+    gold = models.PositiveBigIntegerField(default=0)
+    played_time_total = models.PositiveIntegerField(default=0)
+    played_time_level = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        db_table = "ft_profile_altaddondata"
 
     def __str__(self):
         return f"{self.alt.alt_name} - {self.alt.alt_realm}"

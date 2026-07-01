@@ -15,9 +15,17 @@ test.py
 # claude local settings
 .claude/settings.local.json
 
+# Celery
+celerybeat-schedule
+celerybeat.pid
+
 # Python
 __pycache__/
 *.pyc
 *.pyo
 coverage.xml
 .coverage
+
+# Celery
+celerybeat-schedule
+celerybeat.pid

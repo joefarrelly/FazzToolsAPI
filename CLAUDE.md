@@ -1,6 +1,6 @@
 # FazzToolsAPI
 
-Django REST Framework backend for **FazzTools** — a World of Warcraft companion app. Integrates with the Blizzard Battle.net API to sync character data (professions, equipment, mounts, pets) and parses uploaded WoW Lua addon files to serve keybind data.
+Django REST Framework backend for **FazzTools** — a World of Warcraft companion app. Integrates with the Blizzard Battle.net API to sync character data (professions, equipment, mounts, pets) and stores uploaded WoW Lua addon exports for future addon-only data (gold, currencies, lockouts).
 
 The companion frontend lives at `../FazzToolsFrontend` (React, port 3000 in dev).
 
@@ -71,12 +71,12 @@ apicore/                The single Django app
   serializers.py        DRF serializers
   permissions.py        IsSessionUser permission class
   libs/
-    keybind_builder.py  Pure keybind-building logic (build_all/single_keybinds, tier_sort_key)
-    keybind_mapping.py  Slot→action-button mappings per addon
-    lua_parser.py       Hand-rolled Lua-table-to-JSON converter
-    icon_mapping.py     Mount/pet icon mappings
+    lua_parser.py         Hand-rolled Lua-table-to-JSON converter
+    icon_mapping.py       Mount/pet icon mappings
+    faction_expansion.py  Hardcoded faction_id → expansion name mapping (283 factions)
+    expansion_order.py    tier_sort_key — sorts profession tiers by expansion order
   migrations/           DB migrations
-tests/                  pytest suite (47 tests); run via pytest tests/
+tests/                  pytest suite (33 tests); run via pytest tests/
 conftest.py             pytest env-var setup (pytest_configure hook)
 ```
 
@@ -96,16 +96,31 @@ conftest.py             pytest env-var setup (pytest_configure hook)
 - `altprofessiondatas` — `ProfileAltProfessionData`: Known recipes per alt/profession
 - `altequipments` — `ProfileAltEquipment`: Equipped gear slots per alt
 - `usermounts` / `userpets` — Collected mounts/pets per user
+- `altachievements` — `ProfileAltAchievement`: Achievement completions per alt
+- `altreputations` — `ProfileAltReputation`: Faction standing per alt
+- `altmythicplus` — `ProfileAltMythicPlus`: Current-season M+ rating summary per alt
+- `altmythicplusdungeons` — `ProfileAltMythicPlusDungeon`: Best run per dungeon per alt
+- `altaddondata` — `ProfileAltAddonData`: Gold + played time per alt, parsed from the uploaded `.lua` file (addon-only, no Blizzard API equivalent)
 
 ### Data endpoints (static WoW data, synced via DataScan task)
 - `professions`, `professiontiers`, `professionrecipes`, `reagents`, `recipereagents`
 - `equipments`, `equipmentvariants`
 - `mounts`, `pets`
+- `achievements` — `DataAchievement`: All WoW achievements (name, points, category)
+- `factions` — `DataFaction`: All WoW reputation factions
+- `mythicdungeons` — `DataMythicDungeon`: All Mythic+ dungeons (current and historical)
 
 ### Custom endpoints
 - `POST /api/custom/bnetlogin/` — Battle.net OAuth2 callback; creates/updates user and syncs alts
+- `POST /api/custom/logout/` — Flushes Django session and removes auth state
 - `POST /api/custom/scanalt/` — Triggers `fullAltScan` Celery task for a user
-- `POST /api/custom/datascan/` — Triggers `fullDataScan` Celery task (Django admin user required)
+- `POST /api/custom/datascan/` — Triggers all data scans (Django admin required)
+- `POST /api/custom/datascan/professions/` — Triggers profession data scan only
+- `POST /api/custom/datascan/mounts/` — Triggers mount data scan only
+- `POST /api/custom/datascan/pets/` — Triggers pet data scan only
+- `POST /api/custom/datascan/achievements/` — Triggers achievement data scan only
+- `POST /api/custom/datascan/factions/` — Triggers faction data scan only
+- `POST /api/custom/datascan/mythicdungeons/` — Triggers Mythic+ dungeon catalog scan only
 
 ## Key data flows
 
@@ -113,24 +128,36 @@ conftest.py             pytest env-var setup (pytest_configure hook)
 `BnetLogin.create` → exchanges auth code for token (using `Authorization: Bearer` header) → fetches WoW profile → HMAC-hashes Blizzard user ID → upserts `ProfileUser` and all `ProfileAlt` records.
 
 ### Alt scan (`fullAltScan` Celery task)
-For each alt belonging to a user, fetches from Blizzard API:
-1. `/professions` → upserts `ProfileAltProfession` + `ProfileAltProfessionData` (creates missing `DataProfessionRecipe` entries on the fly)
-2. `/equipment` → upserts `ProfileAltEquipment` + `DataEquipment` / `DataEquipmentVariant`
-3. `/collections/mounts` → links known `DataMount` records to user via `ProfileUserMount`
-4. `/collections/pets` → links known `DataPet` records to user via `ProfileUserPet`
+Dispatches two sets of tasks in parallel:
+
+**Per-alt** (`scan_single_alt` × N alts):
+1. Character summary → updates `ProfileAlt.alt_ilvl` (equipped item level)
+2. `/professions` → upserts `ProfileAltProfession` + `ProfileAltProfessionData`
+3. `/equipment` → upserts `ProfileAltEquipment` + `DataEquipment` / `DataEquipmentVariant`
+4. `/reputations` → upserts `ProfileAltReputation` per faction
+5. `/mythic-keystone-profile` → upserts `ProfileAltMythicPlus` + `ProfileAltMythicPlusDungeon`. The main endpoint only lists season refs (no rating/runs) — the season id isn't flagged as "current" anywhere, so `max(season.id)` is used to pick it, then a second call to `/mythic-keystone-profile/season/{id}` fetches `mythic_rating` and `best_runs`. Blizzard can list two `best_runs` entries per dungeon (best-timed and best-overall, same `map_rating` but different `keystone_level`) — the sync keeps the higher level.
+
+**Per-user** (`scan_user_collection` × 1):
+Picks the highest-level, highest-ilvl alt per faction (Alliance + Horde) and fetches:
+- `/collections/mounts` → links known `DataMount` to user via `ProfileUserMount`
+- `/collections/pets` → links known `DataPet` to user via `ProfileUserPet`
+- `/achievements` → upserts `ProfileAltAchievement` for that representative alt
 
 ### Data scan (`fullDataScan` Celery task)
-Fetches Blizzard static data API indexes and walks all professions (tiers → categories → recipes → reagents) and all mounts/pets, creating `Data*` records.
+Dispatches six independent subtasks: `scanProfessionData`, `scanMountData`, `scanPetData`, `scanAchievementData`, `scanFactionData`, `scanMythicDungeonData`. Each can also be triggered individually via its own endpoint. The dungeon index requires `namespace=dynamic-eu` (not `static-eu` like other catalogs).
 
-### Lua keybind file
-`ProfileUser.perform_update` validates and stores a `FazzToolsScraper.lua` addon export.  
-`ProfileUserView.list` with `?page=all` or `?page=single` parses the stored Lua file using the `recursive()` function (a hand-rolled Lua-table-to-JSON converter) and joins results against `ProfileAlt` + Blizzard spell data. Returns per-spec keybind mappings.
+### Scheduled tasks (`CELERY_BEAT_SCHEDULE` in `settings.py`)
+- `purge_stale_profiles` — daily, deletes expired profile records.
+- `fullDataScan` — weekly, Sunday 03:00 UTC, with `BLIZZ_CLIENT`/`BLIZZ_SECRET` baked into the schedule args at startup. The admin-triggered `/api/custom/datascan/` endpoints still work for ad-hoc/manual scans (e.g. testing a single category).
+
+### Lua addon file
+`ProfileUser.perform_update` validates and stores a `FazzToolsScraper.lua` addon export, then parses it via `LuaParser` and upserts `ProfileAltAddonData` for each alt found in the file (matched by `f"{alt.alt_name}-{alt.alt_realm}"`, the display name + display realm key `core.lua` writes). This is parse-on-upload, not parse-on-read — there's no Celery sync task for this data since it only ever exists in the addon export, never the Blizzard API, so the upload itself is the sync point. A failed parse logs a warning and leaves the stored file/timestamp update intact rather than failing the upload. Currencies/lockouts/keystone/vault are captured by the addon but not yet parsed into a model — same pattern, not built.
 
 ## Database tables (all prefixed `ft_`)
 
-**Data (static):** `ft_data_profession`, `ft_data_professiontier`, `ft_data_professionrecipe`, `ft_data_reagent`, `ft_data_recipereagent`, `ft_data_equipment`, `ft_data_equipmentvariant`, `ft_data_mount`, `ft_data_pet`
+**Data (static):** `ft_data_profession`, `ft_data_professiontier`, `ft_data_professionrecipe`, `ft_data_reagent`, `ft_data_recipereagent`, `ft_data_equipment`, `ft_data_equipmentvariant`, `ft_data_mount`, `ft_data_pet`, `ft_data_achievement`, `ft_data_faction`, `ft_data_mythicdungeon`
 
-**Profile (user):** `ft_profile_user`, `ft_profile_alt`, `ft_profile_altprofession`, `ft_profile_altprofessiondata`, `ft_profile_altequipment`, `ft_profile_usermount`, `ft_profile_userpet`
+**Profile (user):** `ft_profile_user`, `ft_profile_alt`, `ft_profile_altprofession`, `ft_profile_altprofessiondata`, `ft_profile_altequipment`, `ft_profile_usermount`, `ft_profile_userpet`, `ft_profile_altachievement`, `ft_profile_altreputation`, `ft_profile_altmythicplus`, `ft_profile_altmythicplusdungeon`, `ft_profile_altaddondata`
 
 ## Things to know
 

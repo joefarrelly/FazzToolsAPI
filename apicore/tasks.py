@@ -8,11 +8,15 @@ from django.utils import timezone
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
+from apicore.libs.faction_expansion import FACTION_EXPANSION
 from apicore.libs.mount_icons import MOUNT_ICONS
 from apicore.models import (
+    DataAchievement,
     DataEquipment,
     DataEquipmentVariant,
+    DataFaction,
     DataMount,
+    DataMythicDungeon,
     DataPet,
     DataProfession,
     DataProfessionRecipe,
@@ -20,9 +24,13 @@ from apicore.models import (
     DataReagent,
     DataRecipeReagent,
     ProfileAlt,
+    ProfileAltAchievement,
     ProfileAltEquipment,
+    ProfileAltMythicPlus,
+    ProfileAltMythicPlusDungeon,
     ProfileAltProfession,
     ProfileAltProfessionData,
+    ProfileAltReputation,
     ProfileUser,
     ProfileUserMount,
     ProfileUserPet,
@@ -34,6 +42,7 @@ _EU_TOKEN_URL = "https://eu.battle.net/oauth/token"
 _EU_API_BASE = "https://eu.api.blizzard.com"
 _PROFILE_PARAMS = {"namespace": "profile-eu", "locale": "en_US"}
 _STATIC_PARAMS = {"namespace": "static-eu", "locale": "en_US"}
+_DYNAMIC_PARAMS = {"namespace": "dynamic-eu", "locale": "en_US"}
 _LOCALE_PARAMS = {"locale": "en_US"}
 
 _EQUIPMENT_SLOTS = [
@@ -90,7 +99,17 @@ _STAT_FIELDS = {
 }
 
 _session = requests.Session()
-_session.mount("https://", HTTPAdapter(max_retries=Retry(total=3, backoff_factor=1)))
+_session.mount(
+    "https://",
+    HTTPAdapter(
+        max_retries=Retry(
+            total=5,
+            backoff_factor=1,
+            status_forcelist=[429, 500, 502, 503, 504],
+            allowed_methods=["HEAD", "GET", "POST"],
+        )
+    ),
+)
 
 
 # ---------------------------------------------------------------------------
@@ -127,37 +146,100 @@ def fullAltScan(user_id: str, client: str, secret: str) -> None:
     ProfileUser.objects.filter(user_id=user_id).update(user_last_update=timezone.now())
     logger.info("Dispatching %d alt scan tasks for user %s", len(alt_ids), user_id)
     group(scan_single_alt.s(alt_id, user_id, token) for alt_id in alt_ids).apply_async()
+    scan_user_collection.delay(user_id, token)
+
+
+@shared_task(bind=True)
+def scan_single_alt(self, alt_id: int, user_id: str, token: str) -> None:
+    try:
+        alt = ProfileAlt.objects.get(alt_id=alt_id)
+        auth_headers = {"Authorization": f"Bearer {token}"}
+
+        char_base = (
+            f"{_EU_API_BASE}/profile/wow/character/{alt.alt_realm_slug}/{alt.alt_name.lower()}"
+        )
+
+        summary_resp = _api_get(char_base, _PROFILE_PARAMS, auth_headers)
+        if summary_resp.status_code == 200:
+            ilvl = summary_resp.json().get("equipped_item_level", 0)
+            ProfileAlt.objects.filter(alt_id=alt_id).update(alt_ilvl=ilvl)
+
+        endpoints = {
+            "professions": f"{char_base}/professions",
+            "equipment": f"{char_base}/equipment",
+            "reputations": f"{char_base}/reputations",
+        }
+
+        for key, url in endpoints.items():
+            resp = _api_get(url, _PROFILE_PARAMS, auth_headers)
+            if resp.status_code != 200:
+                logger.warning("Blizzard API %s %s", resp.status_code, url)
+                continue
+            if key == "professions":
+                _sync_professions(alt, resp.json(), auth_headers)
+            elif key == "equipment":
+                _sync_equipment(alt, resp.json())
+            elif key == "reputations":
+                _sync_reputations(alt, resp.json())
+
+        _sync_mythic_plus(alt, char_base, auth_headers)
+
+        logger.info("Completed alt scan: %s-%s", alt.alt_name, alt.alt_realm_slug)
+    except Exception as exc:
+        logger.error(
+            "scan_single_alt failed: alt_id=%s user_id=%s task_id=%s error=%s",
+            alt_id,
+            user_id,
+            self.request.id,
+            exc,
+        )
+        raise
 
 
 @shared_task
-def scan_single_alt(alt_id: int, user_id: str, token: str) -> None:
-    alt = ProfileAlt.objects.get(alt_id=alt_id)
-    user = ProfileUser.objects.get(user_id=user_id)
-    auth_headers = {"Authorization": f"Bearer {token}"}
+def scan_user_collection(user_id: str, token: str) -> None:
+    """Fetch account-wide data (mounts, pets, achievements) from one alt per faction."""
+    try:
+        user = ProfileUser.objects.get(user_id=user_id)
+        auth_headers = {"Authorization": f"Bearer {token}"}
 
-    char_base = f"{_EU_API_BASE}/profile/wow/character/{alt.alt_realm_slug}/{alt.alt_name.lower()}"
-    endpoints = {
-        "professions": f"{char_base}/professions",
-        "equipment": f"{char_base}/equipment",
-        "mounts": f"{char_base}/collections/mounts",
-        "pets": f"{char_base}/collections/pets",
-    }
+        alts_by_faction: dict[str, ProfileAlt] = {}
+        for alt in ProfileAlt.objects.filter(user=user_id).order_by("-alt_level", "-alt_ilvl"):
+            faction = alt.alt_faction.upper()
+            if faction not in alts_by_faction:
+                alts_by_faction[faction] = alt
+            if len(alts_by_faction) >= 2:
+                break
 
-    for key, url in endpoints.items():
-        resp = _api_get(url, _PROFILE_PARAMS, auth_headers)
-        if resp.status_code != 200:
-            logger.warning("Blizzard API %s %s", resp.status_code, url)
-            continue
-        if key == "professions":
-            _sync_professions(alt, resp.json(), auth_headers)
-        elif key == "equipment":
-            _sync_equipment(alt, resp.json())
-        elif key == "mounts":
-            _sync_mounts(user, resp.json())
-        elif key == "pets":
-            _sync_pets(user, resp.json())
+        for faction, alt in alts_by_faction.items():
+            char_base = (
+                f"{_EU_API_BASE}/profile/wow/character/{alt.alt_realm_slug}/{alt.alt_name.lower()}"
+            )
+            for endpoint, key in [
+                (f"{char_base}/collections/mounts", "mounts"),
+                (f"{char_base}/collections/pets", "pets"),
+                (f"{char_base}/achievements", "achievements"),
+            ]:
+                resp = _api_get(endpoint, _PROFILE_PARAMS, auth_headers)
+                if resp.status_code != 200:
+                    logger.warning("Blizzard API %s %s", resp.status_code, endpoint)
+                    continue
+                if key == "mounts":
+                    _sync_mounts(user, resp.json())
+                elif key == "pets":
+                    _sync_pets(user, resp.json())
+                elif key == "achievements":
+                    _sync_achievements(alt, resp.json())
 
-    logger.info("Completed alt scan: %s-%s", alt.alt_name, alt.alt_realm_slug)
+            logger.info(
+                "Completed collection scan for %s faction via %s-%s",
+                faction,
+                alt.alt_name,
+                alt.alt_realm_slug,
+            )
+    except Exception as exc:
+        logger.error("scan_user_collection failed: user_id=%s error=%s", user_id, exc)
+        raise
 
 
 def _sync_professions(alt: ProfileAlt, data: dict, auth_headers: dict) -> None:
@@ -298,14 +380,14 @@ def _sync_equipment(alt: ProfileAlt, data: dict) -> None:
 
 def _parse_item_stats(item: dict) -> dict:
     defaults = {v: 0 for v in _STAT_FIELDS.values()}
-    defaults["armour"] = 0
+    defaults["armor"] = 0
 
     for stat in item.get("stats", []):
         field = _STAT_FIELDS.get(stat.get("type", {}).get("type", ""))
         if field:
             defaults[field] = stat.get("value", 0)
 
-    defaults["armour"] = item.get("armor", {}).get("value", 0)
+    defaults["armor"] = item.get("armor", {}).get("value", 0)
     defaults["level"] = item.get("level", {}).get("value", 0)
     defaults["quality"] = item.get("quality", {}).get("name", "")
     return defaults
@@ -346,27 +428,88 @@ def _sync_pets(user: ProfileUser, data: dict) -> None:
 
 @shared_task
 def fullDataScan(client: str, secret: str) -> str:
+    scanProfessionData.delay(client, secret)
+    scanMountData.delay(client, secret)
+    scanPetData.delay(client, secret)
+    scanAchievementData.delay(client, secret)
+    scanFactionData.delay(client, secret)
+    scanMythicDungeonData.delay(client, secret)
+    return "Dispatched all data scans"
+
+
+@shared_task
+def scanProfessionData(client: str, secret: str) -> str:
     token = _fetch_token(client, secret)
     auth_headers = {"Authorization": f"Bearer {token}"}
+    resp = _api_get(f"{_EU_API_BASE}/data/wow/profession/index", _STATIC_PARAMS, auth_headers)
+    if resp.status_code != 200:
+        logger.error("Blizzard API %s profession/index", resp.status_code)
+        return "Failed"
+    _sync_profession_data(resp.json(), auth_headers)
+    return "Done"
 
-    index_urls = [
-        f"{_EU_API_BASE}/data/wow/profession/index",
-        f"{_EU_API_BASE}/data/wow/mount/index",
-        f"{_EU_API_BASE}/data/wow/pet/index",
-    ]
 
-    for url in index_urls:
-        resp = _api_get(url, _STATIC_PARAMS, auth_headers)
-        if resp.status_code != 200:
-            logger.error("Blizzard API %s %s", resp.status_code, url)
-            continue
-        if "profession" in url:
-            _sync_profession_data(resp.json(), auth_headers)
-        elif "mount" in url:
-            _sync_mount_data(resp.json(), auth_headers)
-        elif "pet" in url:
-            _sync_pet_data(resp.json(), auth_headers)
+@shared_task
+def scanMountData(client: str, secret: str) -> str:
+    token = _fetch_token(client, secret)
+    auth_headers = {"Authorization": f"Bearer {token}"}
+    resp = _api_get(f"{_EU_API_BASE}/data/wow/mount/index", _STATIC_PARAMS, auth_headers)
+    if resp.status_code != 200:
+        logger.error("Blizzard API %s mount/index", resp.status_code)
+        return "Failed"
+    _sync_mount_data(resp.json(), auth_headers)
+    return "Done"
 
+
+@shared_task
+def scanPetData(client: str, secret: str) -> str:
+    token = _fetch_token(client, secret)
+    auth_headers = {"Authorization": f"Bearer {token}"}
+    resp = _api_get(f"{_EU_API_BASE}/data/wow/pet/index", _STATIC_PARAMS, auth_headers)
+    if resp.status_code != 200:
+        logger.error("Blizzard API %s pet/index", resp.status_code)
+        return "Failed"
+    _sync_pet_data(resp.json(), auth_headers)
+    return "Done"
+
+
+@shared_task
+def scanAchievementData(client: str, secret: str) -> str:
+    token = _fetch_token(client, secret)
+    auth_headers = {"Authorization": f"Bearer {token}"}
+    resp = _api_get(f"{_EU_API_BASE}/data/wow/achievement/index", _STATIC_PARAMS, auth_headers)
+    if resp.status_code != 200:
+        logger.error("Blizzard API %s achievement/index", resp.status_code)
+        return "Failed"
+    _sync_achievement_data(resp.json(), auth_headers)
+    return "Done"
+
+
+@shared_task
+def scanFactionData(client: str, secret: str) -> str:
+    token = _fetch_token(client, secret)
+    auth_headers = {"Authorization": f"Bearer {token}"}
+    resp = _api_get(
+        f"{_EU_API_BASE}/data/wow/reputation-faction/index", _STATIC_PARAMS, auth_headers
+    )
+    if resp.status_code != 200:
+        logger.error("Blizzard API %s reputation-faction/index", resp.status_code)
+        return "Failed"
+    _sync_faction_data(resp.json())
+    return "Done"
+
+
+@shared_task
+def scanMythicDungeonData(client: str, secret: str) -> str:
+    token = _fetch_token(client, secret)
+    auth_headers = {"Authorization": f"Bearer {token}"}
+    resp = _api_get(
+        f"{_EU_API_BASE}/data/wow/mythic-keystone/dungeon/index", _DYNAMIC_PARAMS, auth_headers
+    )
+    if resp.status_code != 200:
+        logger.error("Blizzard API %s mythic-keystone/dungeon/index", resp.status_code)
+        return "Failed"
+    _sync_mythic_dungeon_data(resp.json())
     return "Done"
 
 
@@ -595,3 +738,218 @@ def _sync_pet_data(index_data: dict, auth_headers: dict) -> None:
             )
         except (KeyError, TypeError) as exc:
             logger.warning("Failed to parse pet: %s", exc)
+
+
+# ---------------------------------------------------------------------------
+# Maintenance — purge stale profile data
+# ---------------------------------------------------------------------------
+
+
+@shared_task
+def purge_stale_profiles() -> None:
+    now = timezone.now()
+    prof_data_deleted, _ = ProfileAltProfessionData.objects.filter(
+        alt_profession_data_expiry_date__lt=now
+    ).delete()
+    prof_deleted, _ = ProfileAltProfession.objects.filter(
+        alt_profession_expiry_date__lt=now
+    ).delete()
+    equip_deleted, _ = ProfileAltEquipment.objects.filter(
+        alt_equipment_expiry_date__lt=now
+    ).delete()
+    ach_deleted, _ = ProfileAltAchievement.objects.filter(
+        alt_achievement_expiry_date__lt=now
+    ).delete()
+    rep_deleted, _ = ProfileAltReputation.objects.filter(
+        alt_reputation_expiry_date__lt=now
+    ).delete()
+    alt_deleted, _ = ProfileAlt.objects.filter(alt_expiry_date__lt=now).delete()
+    logger.info(
+        "purge_stale_profiles: deleted %d profession_data, %d professions, %d equipment, "
+        "%d achievements, %d reputations, %d alts",
+        prof_data_deleted,
+        prof_deleted,
+        equip_deleted,
+        ach_deleted,
+        rep_deleted,
+        alt_deleted,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Per-alt sync helpers — achievements + reputations
+# ---------------------------------------------------------------------------
+
+
+def _sync_achievements(alt: ProfileAlt, data: dict) -> None:
+    expiry = timezone.now() + datetime.timedelta(days=30)
+    for ach_data in data.get("achievements", []):
+        try:
+            ach_ref = ach_data.get("achievement", {})
+            ach_id = ach_ref.get("id") or ach_data.get("id")
+            if not ach_id:
+                continue
+            achievement, _ = DataAchievement.objects.get_or_create(
+                achievement_id=ach_id,
+                defaults={"achievement_name": ach_ref.get("name", "Unknown")},
+            )
+            ts = ach_data.get("completed_timestamp")
+            completed = timezone.datetime.fromtimestamp(ts / 1000, tz=datetime.UTC) if ts else None
+            ProfileAltAchievement.objects.update_or_create(
+                alt=alt,
+                achievement=achievement,
+                defaults={
+                    "completed_timestamp": completed,
+                    "alt_achievement_expiry_date": expiry,
+                },
+            )
+        except (KeyError, TypeError) as exc:
+            logger.warning("Failed to sync achievement for %s: %s", alt.alt_name, exc)
+
+
+def _sync_reputations(alt: ProfileAlt, data: dict) -> None:
+    expiry = timezone.now() + datetime.timedelta(days=30)
+    for rep_data in data.get("reputations", []):
+        try:
+            faction_ref = rep_data.get("faction", {})
+            faction_id = faction_ref.get("id")
+            if not faction_id:
+                continue
+            standing = rep_data.get("standing", {})
+            if not standing:
+                continue
+            faction, _ = DataFaction.objects.update_or_create(
+                faction_id=faction_id,
+                defaults={
+                    "faction_name": faction_ref.get("name", "Unknown"),
+                    "faction_category": FACTION_EXPANSION.get(faction_id, ""),
+                },
+            )
+            ProfileAltReputation.objects.update_or_create(
+                alt=alt,
+                faction=faction,
+                defaults={
+                    "standing_type": standing.get("name", ""),
+                    "standing_value": standing.get("raw", 0),
+                    "alt_reputation_expiry_date": expiry,
+                },
+            )
+        except (KeyError, TypeError) as exc:
+            logger.warning("Failed to sync reputation for %s: %s", alt.alt_name, exc)
+
+
+def _sync_mythic_plus(alt: ProfileAlt, char_base: str, auth_headers: dict) -> None:
+    resp = _api_get(f"{char_base}/mythic-keystone-profile", _PROFILE_PARAMS, auth_headers)
+    if resp.status_code != 200:
+        return
+    seasons = resp.json().get("seasons", [])
+    if not seasons:
+        return
+    current_season_id = max(s["id"] for s in seasons)
+
+    season_resp = _api_get(
+        f"{char_base}/mythic-keystone-profile/season/{current_season_id}",
+        _PROFILE_PARAMS,
+        auth_headers,
+    )
+    if season_resp.status_code != 200:
+        logger.warning(
+            "Blizzard API %s mythic-keystone-profile/season/%s",
+            season_resp.status_code,
+            current_season_id,
+        )
+        return
+
+    data = season_resp.json()
+    expiry = timezone.now() + datetime.timedelta(days=30)
+    mp_record, _ = ProfileAltMythicPlus.objects.update_or_create(
+        alt=alt,
+        defaults={
+            "season_id": data.get("season", {}).get("id", current_season_id),
+            "mythic_rating": data.get("mythic_rating", {}).get("rating", 0),
+            "alt_mythicplus_expiry_date": expiry,
+        },
+    )
+
+    # Blizzard can list two entries per dungeon (best-timed and best-overall) sharing the
+    # same map_rating but different keystone_level — keep the highest level per dungeon.
+    best_run_by_dungeon: dict[int, dict] = {}
+    for run in data.get("best_runs", []):
+        dungeon_id = run.get("dungeon", {}).get("id")
+        if dungeon_id is None:
+            continue
+        existing = best_run_by_dungeon.get(dungeon_id)
+        if existing is None or run.get("keystone_level", 0) > existing.get("keystone_level", 0):
+            best_run_by_dungeon[dungeon_id] = run
+
+    for dungeon_id, run in best_run_by_dungeon.items():
+        try:
+            dungeon = DataMythicDungeon.objects.get(dungeon_id=dungeon_id)
+        except DataMythicDungeon.DoesNotExist:
+            continue
+        ts = run.get("completed_timestamp")
+        completed = timezone.datetime.fromtimestamp(ts / 1000, tz=datetime.UTC) if ts else None
+        ProfileAltMythicPlusDungeon.objects.update_or_create(
+            alt=mp_record,
+            dungeon=dungeon,
+            defaults={
+                "keystone_level": run.get("keystone_level", 0),
+                "score": run.get("map_rating", {}).get("rating", 0),
+                "completed_timestamp": completed,
+                "is_completed_within_time": run.get("is_completed_within_time", False),
+                "alt_mythicplusdungeon_expiry_date": expiry,
+            },
+        )
+
+
+# ---------------------------------------------------------------------------
+# Static data sync helpers — achievements + factions
+# ---------------------------------------------------------------------------
+
+
+def _sync_achievement_data(index_data: dict, auth_headers: dict) -> None:
+    achievements = index_data.get("achievements", [])
+    total = len(achievements)
+    logger.info("Achievement scan: %d achievements to process", total)
+    for i, ach_ref in enumerate(achievements, 1):
+        if i % 100 == 0 or i == total:
+            logger.info("Achievement scan: %d/%d", i, total)
+        resp = _api_get(ach_ref["key"]["href"], _STATIC_PARAMS, auth_headers)
+        if resp.status_code != 200:
+            logger.warning("Blizzard API %s %s", resp.status_code, ach_ref["key"]["href"])
+            continue
+        try:
+            details = resp.json()
+            DataAchievement.objects.update_or_create(
+                achievement_id=details["id"],
+                defaults={
+                    "achievement_name": details["name"],
+                    "achievement_points": details.get("points", 0),
+                    "achievement_category": details.get("category", {}).get("name", ""),
+                },
+            )
+        except (KeyError, TypeError) as exc:
+            logger.warning("Failed to parse achievement %s: %s", ach_ref.get("id"), exc)
+    logger.info("Achievement scan complete")
+
+
+def _sync_faction_data(index_data: dict) -> None:
+    for faction_ref in index_data.get("factions", []):
+        try:
+            DataFaction.objects.get_or_create(
+                faction_id=faction_ref["id"],
+                defaults={"faction_name": faction_ref["name"]},
+            )
+        except (KeyError, TypeError) as exc:
+            logger.warning("Failed to parse faction %s: %s", faction_ref.get("id"), exc)
+
+
+def _sync_mythic_dungeon_data(index_data: dict) -> None:
+    for dungeon_ref in index_data.get("dungeons", []):
+        try:
+            DataMythicDungeon.objects.get_or_create(
+                dungeon_id=dungeon_ref["id"],
+                defaults={"dungeon_name": dungeon_ref["name"]},
+            )
+        except (KeyError, TypeError) as exc:
+            logger.warning("Failed to parse dungeon %s: %s", dungeon_ref.get("id"), exc)

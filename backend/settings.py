@@ -1,6 +1,7 @@
 from pathlib import Path
 
 import environ
+from celery.schedules import crontab
 
 env = environ.Env()
 environ.Env.read_env()
@@ -106,9 +107,26 @@ CELERY_TASK_ROUTES = {
     "apicore.tasks.scan_single_alt": {"queue": "alt_scan"},
 }
 
+CELERY_BEAT_SCHEDULE = {
+    "purge-stale-profiles-daily": {
+        "task": "apicore.tasks.purge_stale_profiles",
+        "schedule": 86400,
+    },
+    "full-data-scan-weekly": {
+        "task": "apicore.tasks.fullDataScan",
+        "schedule": crontab(day_of_week="sunday", hour=3, minute=0),
+        "args": (env("BLIZZ_CLIENT"), env("BLIZZ_SECRET")),
+    },
+}
+
 REST_FRAMEWORK = {
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
     "PAGE_SIZE": 100,
+    # Profile/custom endpoints use the custom IsSessionUser permission, not Django auth,
+    # so they don't need an authenticator. Leaving SessionAuthentication as the default
+    # meant any lingering Django admin session cookie (from /api/admin/) made DRF enforce
+    # CSRF on every API call, breaking bnetlogin and other endpoints for logged-in admins.
+    "DEFAULT_AUTHENTICATION_CLASSES": [],
 }
 
 CORS_ALLOWED_ORIGINS = [

@@ -1,6 +1,7 @@
 [tool.ruff]
 target-version = "py312"
 line-length = 100
+exclude = ["apicore/migrations/*"]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "UP", "DJ"]
@@ -11,7 +12,7 @@ known-first-party = ["apicore"]
 [tool.pytest.ini_options]
 DJANGO_SETTINGS_MODULE = "backend.test_settings"
 python_files = ["tests/test_*.py"]
-addopts = "--cov=apicore --cov-report=term-missing --cov-report=xml"
+addopts = "--cov=apicore --cov-report=term-missing"
 
 [tool.coverage.run]
 omit = ["*/migrations/*", "*/libs/icon_mapping.py", "*/libs/mount_icons.py", "*/libs/race_mapping.py"]

@@ -2,12 +2,13 @@
 
 [![Deploy](https://github.com/joefarrelly/FazzToolsAPI/actions/workflows/deploy.yml/badge.svg)](https://github.com/joefarrelly/FazzToolsAPI/actions/workflows/deploy.yml)
 [![Lint and Test](https://github.com/joefarrelly/FazzToolsAPI/actions/workflows/lint.yml/badge.svg)](https://github.com/joefarrelly/FazzToolsAPI/actions/workflows/lint.yml)
-[![codecov](https://codecov.io/gh/joefarrelly/FazzToolsAPI/graph/badge.svg)](https://codecov.io/gh/joefarrelly/FazzToolsAPI)
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
+
+**Suite:** [Backend](https://github.com/joefarrelly/FazzToolsAPI) · [Frontend](https://github.com/joefarrelly/FazzToolsFrontend) · [Addon](https://github.com/joefarrelly/FazzToolsScraper)
 
 Django REST Framework backend for **FazzTools** — a World of Warcraft companion app.
 
-Syncs character data (professions, equipment, mounts, pets) from the Blizzard Battle.net API and parses WoW Lua addon exports to serve keybind data.
+Syncs character data (professions, equipment, mounts, pets) from the Blizzard Battle.net API and stores uploaded WoW Lua addon exports for future addon-only data.
 
 The companion frontend lives at [FazzToolsFrontend](../FazzToolsFrontend).
 

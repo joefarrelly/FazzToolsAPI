@@ -4,26 +4,29 @@ import hmac
 import logging
 import os
 import re
-import string
 import time
 
 import environ
 import requests
-from django.core.cache import cache
+from django.core.files.base import ContentFile
 from django.db import models
 from django.utils import timezone
 from requests.adapters import HTTPAdapter
 from rest_framework import response, viewsets
+from rest_framework.authentication import SessionAuthentication
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.permissions import IsAdminUser
 from urllib3.util.retry import Retry
 
-from apicore.libs.keybind_builder import build_all_keybinds, build_single_keybinds, tier_sort_key
+from apicore.libs.expansion_order import tier_sort_key
 from apicore.libs.lua_parser import LuaParser
 from apicore.models import (
+    DataAchievement,
     DataEquipment,
     DataEquipmentVariant,
+    DataFaction,
     DataMount,
+    DataMythicDungeon,
     DataPet,
     DataProfession,
     DataProfessionRecipe,
@@ -31,33 +34,55 @@ from apicore.models import (
     DataReagent,
     DataRecipeReagent,
     ProfileAlt,
+    ProfileAltAchievement,
+    ProfileAltAddonData,
     ProfileAltEquipment,
+    ProfileAltMythicPlus,
+    ProfileAltMythicPlusDungeon,
     ProfileAltProfession,
     ProfileAltProfessionData,
+    ProfileAltReputation,
     ProfileUser,
     ProfileUserMount,
     ProfileUserPet,
 )
 from apicore.permissions import IsSessionUser
 from apicore.serializers import (
+    DataAchievementSerializer,
     DataEquipmentSerializer,
     DataEquipmentVariantSerializer,
+    DataFactionSerializer,
     DataMountSerializer,
+    DataMythicDungeonSerializer,
     DataPetSerializer,
     DataProfessionRecipeSerializer,
     DataProfessionSerializer,
     DataProfessionTierSerializer,
     DataReagentSerializer,
     DataRecipeReagentSerializer,
+    ProfileAltAchievementSerializer,
+    ProfileAltAddonDataSerializer,
     ProfileAltEquipmentSerializer,
+    ProfileAltMythicPlusDungeonSerializer,
+    ProfileAltMythicPlusSerializer,
     ProfileAltProfessionDataSerializer,
     ProfileAltProfessionSerializer,
+    ProfileAltReputationSerializer,
     ProfileAltSerializer,
     ProfileUserMountSerializer,
     ProfileUserPetSerializer,
     ProfileUserSerializer,
 )
-from apicore.tasks import fullAltScan, fullDataScan
+from apicore.tasks import (
+    fullAltScan,
+    fullDataScan,
+    scanAchievementData,
+    scanFactionData,
+    scanMountData,
+    scanMythicDungeonData,
+    scanPetData,
+    scanProfessionData,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -152,18 +177,14 @@ class ProfileUserView(viewsets.ModelViewSet):
             logger.warning("Rejected upload: file too large (%d bytes)", file.size)
             return
 
-        file.name = user_id + ".lua"
-        with file.open("r+") as f:
-            content = f.read().decode("utf-8")
+        content = file.read().decode("utf-8")
 
-            if "FazzToolsScraperDB" not in content[0:25]:
-                logger.warning("Rejected upload: invalid file header")
-                return
+        if "FazzToolsScraperDB" not in content[0:25]:
+            logger.warning("Rejected upload: invalid file header")
+            return
 
-            normalised = re.sub(r'(\r\n|\r|\n)(?=(?:[^"]*"[^"]*")*[^"]*$)', r"\n", content)
-            f.seek(0)
-            f.write(normalised.encode())
-            f.truncate()
+        normalised = re.sub(r'(\r\n|\r|\n)(?=(?:[^"]*"[^"]*")*[^"]*$)', r"\n", content)
+        normalised_file = ContentFile(normalised.encode(), name=user_id + ".lua")
 
         user_obj = ProfileUser.objects.get(user_id=user_id)
         update_date = user_obj.user_last_update
@@ -174,8 +195,30 @@ class ProfileUserView(viewsets.ModelViewSet):
         except OSError as exc:
             logger.warning("Could not remove old file: %s", exc)
 
-        serializer.save(user_id=user_id, user_file=file, user_last_update=update_date)
-        cache.delete(f"keybinds:{user_id}")
+        serializer.save(user_id=user_id, user_file=normalised_file, user_last_update=update_date)
+        self._sync_addon_data(user_id, normalised)
+
+    @staticmethod
+    def _sync_addon_data(user_id, normalised_content):
+        try:
+            parsed = LuaParser(normalised_content.splitlines(keepends=True)).parse()
+        except (ValueError, IndexError) as exc:
+            logger.warning("Could not parse addon file for %s: %s", user_id, exc)
+            return
+
+        addon_alts = parsed.get("alts", {})
+        for alt in ProfileAlt.objects.filter(user=user_id):
+            addon_alt = addon_alts.get(f"{alt.alt_name}-{alt.alt_realm}")
+            if addon_alt is None:
+                continue
+            ProfileAltAddonData.objects.update_or_create(
+                alt=alt,
+                defaults={
+                    "gold": addon_alt.get("gold") or 0,
+                    "played_time_total": addon_alt.get("playedTimeTotal") or 0,
+                    "played_time_level": addon_alt.get("playedTimeLevel") or 0,
+                },
+            )
 
     def list(self, request):
         user_id = request.query_params.get("user")
@@ -192,26 +235,6 @@ class ProfileUserView(viewsets.ModelViewSet):
         if page == "header":
             ts = time.mktime(user_obj.user_last_update.timetuple()) * 1000
             return response.Response([ts])
-
-        if not user_obj.user_file:
-            return response.Response([])
-
-        cache_key = f"keybinds:{user_id}"
-        data = cache.get(cache_key)
-        if data is None:
-            with user_obj.user_file.open("r") as f:
-                lines = [line.decode("utf-8") for line in f.readlines()]
-            data = LuaParser(lines).parse()
-            cache.set(cache_key, data, timeout=None)
-
-        if page == "all":
-            return response.Response(build_all_keybinds(data, user_id))
-
-        if page == "single":
-            alt_name = request.query_params.get("alt", "").title()
-            realm = string.capwords(request.query_params.get("realm", ""))
-            spec = request.query_params.get("spec", "").title()
-            return response.Response(build_single_keybinds(data, alt_name, realm, spec))
 
         return response.Response([])
 
@@ -704,6 +727,230 @@ class BnetLogin(viewsets.ViewSet):
         return response.Response({"user": user_id, "alts": alt_ids})
 
 
+class DataAchievementView(viewsets.ModelViewSet):
+    serializer_class = DataAchievementSerializer
+    queryset = DataAchievement.objects.all()
+
+
+class DataFactionView(viewsets.ModelViewSet):
+    serializer_class = DataFactionSerializer
+    queryset = DataFaction.objects.all()
+
+
+class DataMythicDungeonView(viewsets.ModelViewSet):
+    serializer_class = DataMythicDungeonSerializer
+    queryset = DataMythicDungeon.objects.all()
+
+
+class ProfileAltAchievementView(viewsets.ModelViewSet):
+    serializer_class = ProfileAltAchievementSerializer
+    queryset = ProfileAltAchievement.objects.all()
+
+    def list(self, request):
+        user_id = request.query_params.get("user")
+        alt_name = request.query_params.get("alt", "").title()
+        realm_slug = request.query_params.get("realm", "")
+        summary = request.query_params.get("summary")
+        category = request.query_params.get("category")
+
+        if not user_id:
+            return response.Response([])
+        if request.session.get("user_id") != user_id:
+            return response.Response([], status=403)
+
+        if alt_name and realm_slug:
+            alt = ProfileAlt.objects.filter(
+                alt_name=alt_name, alt_realm_slug=realm_slug, user=user_id
+            ).first()
+            if not alt:
+                return response.Response([])
+            qs = (
+                ProfileAltAchievement.objects.filter(alt=alt)
+                .select_related("achievement")
+                .order_by("-completed_timestamp")
+            )
+        else:
+            alt_ids = ProfileAlt.objects.filter(user=user_id).values_list("alt_id", flat=True)
+            qs = ProfileAltAchievement.objects.filter(alt__in=alt_ids).select_related(
+                "alt", "achievement"
+            )
+
+        # Distinct earned achievement IDs for this user — eliminates duplicates
+        # that arise when the same achievement is stored against multiple alts
+        # (e.g. old per-alt scans before scan_user_collection was introduced).
+        earned_ids = qs.values_list("achievement_id", flat=True).distinct()
+
+        if summary:
+            data = (
+                DataAchievement.objects.filter(achievement_id__in=earned_ids)
+                .values("achievement_category")
+                .annotate(
+                    count=models.Count("pk"),
+                    points=models.Sum("achievement_points"),
+                )
+                .order_by("achievement_category")
+            )
+            return response.Response(
+                [
+                    {
+                        "category_name": r["achievement_category"],
+                        "count": r["count"],
+                        "points": r["points"],
+                    }
+                    for r in data
+                ]
+            )
+
+        if category:
+            achievements = DataAchievement.objects.filter(
+                achievement_id__in=earned_ids,
+                achievement_category=category,
+            ).order_by("achievement_name")
+            return response.Response(
+                [
+                    {
+                        "achievement": a.achievement_id,
+                        "alt": None,
+                        "alt_name": None,
+                        "achievement_name": a.achievement_name,
+                        "achievement_points": a.achievement_points,
+                        "achievement_category": a.achievement_category,
+                        "completed_timestamp": None,
+                    }
+                    for a in achievements
+                ]
+            )
+
+        qs = qs.order_by("achievement__achievement_name")
+        serializer = self.get_serializer(qs, many=True)
+        return response.Response(serializer.data)
+
+
+class ProfileAltReputationView(viewsets.ModelViewSet):
+    serializer_class = ProfileAltReputationSerializer
+    queryset = ProfileAltReputation.objects.all()
+
+    def list(self, request):
+        user_id = request.query_params.get("user")
+        alt_name = request.query_params.get("alt", "").title()
+        realm_slug = request.query_params.get("realm", "")
+
+        if not user_id:
+            return response.Response([])
+        if request.session.get("user_id") != user_id:
+            return response.Response([], status=403)
+
+        if alt_name and realm_slug:
+            alt = ProfileAlt.objects.filter(
+                alt_name=alt_name, alt_realm_slug=realm_slug, user=user_id
+            ).first()
+            if not alt:
+                return response.Response([])
+            qs = (
+                ProfileAltReputation.objects.filter(alt=alt)
+                .select_related("faction")
+                .order_by("-standing_value")
+            )
+        else:
+            alt_ids = ProfileAlt.objects.filter(user=user_id).values_list("alt_id", flat=True)
+            qs = (
+                ProfileAltReputation.objects.filter(alt__in=alt_ids)
+                .select_related("alt", "faction")
+                .order_by("alt__alt_name", "-standing_value")
+            )
+
+        serializer = self.get_serializer(qs, many=True)
+        return response.Response(serializer.data)
+
+
+class ProfileAltMythicPlusView(viewsets.ModelViewSet):
+    serializer_class = ProfileAltMythicPlusSerializer
+    queryset = ProfileAltMythicPlus.objects.all()
+
+    def list(self, request):
+        user_id = request.query_params.get("user")
+        alt_name = request.query_params.get("alt", "").title()
+        realm_slug = request.query_params.get("realm", "")
+
+        if not user_id:
+            return response.Response([])
+        if request.session.get("user_id") != user_id:
+            return response.Response([], status=403)
+
+        if alt_name and realm_slug:
+            alt = ProfileAlt.objects.filter(
+                alt_name=alt_name, alt_realm_slug=realm_slug, user=user_id
+            ).first()
+            if not alt:
+                return response.Response([])
+            qs = ProfileAltMythicPlus.objects.filter(alt=alt)
+        else:
+            alt_ids = ProfileAlt.objects.filter(user=user_id).values_list("alt_id", flat=True)
+            qs = (
+                ProfileAltMythicPlus.objects.filter(alt__in=alt_ids)
+                .select_related("alt")
+                .order_by("-mythic_rating")
+            )
+
+        serializer = self.get_serializer(qs, many=True)
+        return response.Response(serializer.data)
+
+
+class ProfileAltMythicPlusDungeonView(viewsets.ModelViewSet):
+    serializer_class = ProfileAltMythicPlusDungeonSerializer
+    queryset = ProfileAltMythicPlusDungeon.objects.all()
+
+    def list(self, request):
+        user_id = request.query_params.get("user")
+        alt_name = request.query_params.get("alt", "").title()
+        realm_slug = request.query_params.get("realm", "")
+
+        if not user_id:
+            return response.Response([])
+        if request.session.get("user_id") != user_id:
+            return response.Response([], status=403)
+
+        if alt_name and realm_slug:
+            alt = ProfileAlt.objects.filter(
+                alt_name=alt_name, alt_realm_slug=realm_slug, user=user_id
+            ).first()
+            if not alt:
+                return response.Response([])
+            qs = (
+                ProfileAltMythicPlusDungeon.objects.filter(alt__alt=alt)
+                .select_related("dungeon")
+                .order_by("-score")
+            )
+        else:
+            alt_ids = ProfileAlt.objects.filter(user=user_id).values_list("alt_id", flat=True)
+            qs = (
+                ProfileAltMythicPlusDungeon.objects.filter(alt__alt__in=alt_ids)
+                .select_related("alt", "dungeon")
+                .order_by("alt__alt__alt_name", "-score")
+            )
+
+        serializer = self.get_serializer(qs, many=True)
+        return response.Response(serializer.data)
+
+
+class ProfileAltAddonDataView(viewsets.ModelViewSet):
+    serializer_class = ProfileAltAddonDataSerializer
+    queryset = ProfileAltAddonData.objects.all()
+
+    def list(self, request):
+        user_id = request.query_params.get("user")
+
+        if not user_id:
+            return response.Response([])
+        if request.session.get("user_id") != user_id:
+            return response.Response([], status=403)
+
+        alt_ids = ProfileAlt.objects.filter(user=user_id).values_list("alt_id", flat=True)
+        qs = ProfileAltAddonData.objects.filter(alt__in=alt_ids).select_related("alt")
+        serializer = self.get_serializer(qs, many=True)
+        return response.Response(serializer.data)
+
+
 class ScanAlt(viewsets.ViewSet):
     def create(self, request):
         user_id = request.data.get("userid")
@@ -715,9 +962,70 @@ class ScanAlt(viewsets.ViewSet):
         return response.Response(timezone.now())
 
 
+class Logout(viewsets.ViewSet):
+    def create(self, request):
+        request.session.flush()
+        return response.Response("ok")
+
+
 class DataScan(viewsets.ViewSet):
+    authentication_classes = [SessionAuthentication]
     permission_classes = [IsAdminUser]
 
     def create(self, request):
         fullDataScan.delay(BLIZZ_CLIENT, BLIZZ_SECRET)
         return response.Response("Scan started")
+
+
+class DataScanProfessions(viewsets.ViewSet):
+    authentication_classes = [SessionAuthentication]
+    permission_classes = [IsAdminUser]
+
+    def create(self, request):
+        scanProfessionData.delay(BLIZZ_CLIENT, BLIZZ_SECRET)
+        return response.Response("Profession scan started")
+
+
+class DataScanMounts(viewsets.ViewSet):
+    authentication_classes = [SessionAuthentication]
+    permission_classes = [IsAdminUser]
+
+    def create(self, request):
+        scanMountData.delay(BLIZZ_CLIENT, BLIZZ_SECRET)
+        return response.Response("Mount scan started")
+
+
+class DataScanPets(viewsets.ViewSet):
+    authentication_classes = [SessionAuthentication]
+    permission_classes = [IsAdminUser]
+
+    def create(self, request):
+        scanPetData.delay(BLIZZ_CLIENT, BLIZZ_SECRET)
+        return response.Response("Pet scan started")
+
+
+class DataScanAchievements(viewsets.ViewSet):
+    authentication_classes = [SessionAuthentication]
+    permission_classes = [IsAdminUser]
+
+    def create(self, request):
+        scanAchievementData.delay(BLIZZ_CLIENT, BLIZZ_SECRET)
+        return response.Response("Achievement scan started")
+
+
+class DataScanFactions(viewsets.ViewSet):
+    authentication_classes = [SessionAuthentication]
+    permission_classes = [IsAdminUser]
+
+    def create(self, request):
+        scanFactionData.delay(BLIZZ_CLIENT, BLIZZ_SECRET)
+        return response.Response("Faction scan started")
+
+
+class DataScanMythicDungeons(viewsets.ViewSet):
+    authentication_classes = [SessionAuthentication]
+    permission_classes = [IsAdminUser]
+
+    def create(self, request):
+        scanMythicDungeonData.delay(BLIZZ_CLIENT, BLIZZ_SECRET)
+        return response.Response("Mythic dungeon scan started")
